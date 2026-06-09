@@ -867,6 +867,16 @@ const polishChecks: PolishRegressionCheck[] = [
       expect(level.boss?.arenaRight).toBeGreaterThan(level.boss?.arenaLeft ?? 0);
     },
   },
+  {
+    name: "keeps opening chapter checkpoints approachable",
+    run: (levels) => {
+      for (const id of ["level-01","level-02","level-03","level-04","level-05","level-06","level-07"]) {
+        const level = getLevel(levels, id);
+        expect(level.timeLimit).toBeGreaterThanOrEqual(190);
+        expect(level.checkpoints.length).toBe(2);
+      }
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
