@@ -15,6 +15,11 @@ type CanvasSample = {
   width: number;
 };
 
+const SETTINGS_KEY = "clockwork-canopy-settings-v1";
+const TOUCH_CONTROLS_KEY = "clockwork-canopy-touch-controls-v1";
+const GAME_WIDTH = 960;
+const GAME_HEIGHT = 540;
+
 export function collectConsoleErrors(page: Page) {
   const issues: ConsoleIssue[] = [];
 
@@ -47,6 +52,143 @@ export async function bootGame(page: Page) {
   await page.waitForLoadState("domcontentloaded");
   await expect(page.locator("canvas")).toHaveCount(1, { timeout: 15_000 });
   await expect(page.locator("canvas")).toBeVisible();
+}
+
+export async function seedGameSettings(page: Page, settings: Record<string, unknown>) {
+  await page.addInitScript(
+    ([key, value]) => {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    },
+    [SETTINGS_KEY, settings] as const,
+  );
+}
+
+export async function seedTouchControlsMode(page: Page, mode: "auto" | "on" | "off") {
+  await page.addInitScript(
+    ([key, value]) => {
+      window.localStorage.setItem(key, value);
+    },
+    [TOUCH_CONTROLS_KEY, mode] as const,
+  );
+}
+
+export async function expectTouchControlsVisible(page: Page) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          type SceneProbe = {
+            scene?: { isActive?: () => boolean };
+            touchControls?: { isVisible?: () => boolean };
+          };
+          type GameProbe = {
+            scene?: { getScene?: (key: string) => unknown };
+          };
+          const game = (window as Window & { __clockworkCanopyGame?: GameProbe }).__clockworkCanopyGame;
+          const scene = game?.scene?.getScene?.("PlayScene") as SceneProbe | undefined;
+          const active = scene?.scene?.isActive?.() ?? false;
+          const visible = scene?.touchControls?.isVisible?.() ?? false;
+
+          return active && visible ? "ready" : JSON.stringify({ active, visible });
+        }),
+      {
+        message: "touch controls should be visible after touch-started gameplay",
+        timeout: 15_000,
+      },
+    )
+    .toBe("ready");
+}
+
+export async function expectSceneActive(page: Page, sceneKey: string) {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate((key) => {
+          type SceneProbe = {
+            scene?: { isActive?: () => boolean };
+          };
+          type GameProbe = {
+            scene?: { getScene?: (key: string) => unknown };
+          };
+          const game = (window as Window & { __clockworkCanopyGame?: GameProbe }).__clockworkCanopyGame;
+          const scene = game?.scene?.getScene?.(key) as SceneProbe | undefined;
+
+          return scene?.scene?.isActive?.() ? "ready" : "waiting";
+        }, sceneKey),
+      {
+        message: `${sceneKey} should be active`,
+        timeout: 15_000,
+      },
+    )
+    .toBe("ready");
+}
+
+export async function tapCanvasPoint(page: Page, x: number, y: number) {
+  const box = await page.locator("canvas").first().boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.touchscreen.tap(
+    box!.x + (x / GAME_WIDTH) * box!.width,
+    box!.y + (y / GAME_HEIGHT) * box!.height,
+  );
+}
+
+export async function expectCanvasFitsViewport(page: Page) {
+  await expect
+    .poll(
+      async () =>
+        page.locator("canvas").first().evaluate((canvas) => {
+          const rect = canvas.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const tolerance = 1;
+          const fits =
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.left >= -tolerance &&
+            rect.top >= -tolerance &&
+            rect.right <= viewportWidth + tolerance &&
+            rect.bottom <= viewportHeight + tolerance;
+
+          return fits
+            ? "ready"
+            : JSON.stringify({
+                bottom: rect.bottom,
+                height: rect.height,
+                left: rect.left,
+                right: rect.right,
+                top: rect.top,
+                viewportHeight,
+                viewportWidth,
+                width: rect.width,
+              });
+        }),
+      {
+        message: "canvas should stay within the current viewport",
+        timeout: 15_000,
+      },
+    )
+    .toBe("ready");
+}
+
+export async function expectCanvasFrameChanges(page: Page) {
+  const canvas = page.locator("canvas").first();
+  const before = new Uint8Array(await canvas.screenshot());
+
+  await expect
+    .poll(
+      async () => {
+        await page.waitForTimeout(120);
+        const after = new Uint8Array(await canvas.screenshot());
+        const difference = countByteDifferences(before, after);
+        return difference >= 64 ? "changed" : `${difference} byte differences`;
+      },
+      {
+        message: "canvas pixels should change while gameplay input is held",
+        timeout: 4_000,
+      },
+    )
+    .toBe("changed");
 }
 
 export async function expectNonBlankCanvas(page: Page) {
@@ -156,4 +298,17 @@ export async function expectNonBlankCanvas(page: Page) {
       },
     )
     .toBe("ready");
+}
+
+function countByteDifferences(a: Uint8Array, b: Uint8Array): number {
+  const length = Math.min(a.length, b.length);
+  let differences = Math.abs(a.length - b.length);
+
+  for (let index = 0; index < length; index += 1) {
+    if (a[index] !== b[index]) {
+      differences += 1;
+    }
+  }
+
+  return differences;
 }
