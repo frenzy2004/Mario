@@ -46,9 +46,16 @@ export class PauseScene extends Phaser.Scene {
     this.input.keyboard?.once("keydown-ENTER", () => this.resumeGame());
     this.input.keyboard?.once("keydown-R", () => {
       this.fadeToAction(() => {
+        const returnScene = this.registry.get("currentReturnScene");
+        const restartData: { levelIndex: number; returnScene?: "WorldMapScene" } = {
+          levelIndex: this.registry.get("currentLevelIndex") ?? 0,
+        };
+        if (returnScene === "WorldMapScene") {
+          restartData.returnScene = returnScene;
+        }
         this.scene.stop("PlayScene");
         this.scene.stop("HudScene");
-        this.scene.start("PlayScene", { levelIndex: this.registry.get("currentLevelIndex") ?? 0 });
+        this.scene.start("PlayScene", restartData);
       });
     });
     this.input.keyboard?.once("keydown-M", () => {

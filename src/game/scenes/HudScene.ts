@@ -8,6 +8,8 @@ export interface HudState {
   glimmers: number;
   hiddenSeeds: number;
   timeRemaining: number;
+  combo?: number;
+  multiplier?: number;
   soundCue?: string;
 }
 
@@ -173,5 +175,6 @@ export class HudScene extends Phaser.Scene {
 }
 
 function formatHudState(state: HudState): string {
-  return `${state.levelTitle}   Score ${state.score.toLocaleString("en-US")}   Lives ${state.lives}   Health ${state.health}   Glimmers ${state.glimmers}   Seeds ${state.hiddenSeeds}   Time ${state.timeRemaining}`;
+  const combo = state.combo && state.combo >= 3 ? `   Combo ${state.combo} x${state.multiplier ?? 1}` : "";
+  return `${state.levelTitle}   Score ${state.score.toLocaleString("en-US")}   Lives ${state.lives}   Health ${state.health}   Glimmers ${state.glimmers}   Seeds ${state.hiddenSeeds}   Time ${state.timeRemaining}${combo}`;
 }

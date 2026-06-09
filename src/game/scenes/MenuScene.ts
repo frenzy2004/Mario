@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { ALL_LEVELS } from "../levels";
+import { getLevelMetaByIndex, LEVEL_COUNT, levelIndexFromSearch } from "../levels/meta";
+import { ensureGameplayScenes } from "../systems/SceneLoadSystem";
 import { SaveSystem } from "../systems/SaveSystem";
 
 export class MenuScene extends Phaser.Scene {
@@ -15,7 +16,10 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     this.transitioning = false;
     const save = this.saveSystem.loadSave();
-    this.selectedLevel = Math.min(save.unlockedLevel, ALL_LEVELS.length - 1);
+    this.selectedLevel = levelIndexFromSearch(window.location.search, Math.min(save.unlockedLevel, LEVEL_COUNT - 1));
+    if (this.selectedLevel > save.unlockedLevel) {
+      this.selectedLevel = Math.min(save.unlockedLevel, LEVEL_COUNT - 1);
+    }
     this.cameras.main.setBackgroundColor("#07131e");
     this.cameras.main.fadeIn(320, 7, 19, 30);
     this.add.rectangle(480, 270, 960, 540, 0x07131e);
@@ -49,14 +53,14 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const continueText = this.add
-      .text(480, 260, `Continue: ${ALL_LEVELS[this.selectedLevel]!.title}`, {
+      .text(480, 260, `Continue: ${getLevelMetaByIndex(this.selectedLevel).title}`, {
         fontFamily: "system-ui",
         fontSize: "25px",
         color: "#fde68a",
       })
       .setOrigin(0.5);
     const controls = this.add
-      .text(480, 316, "Space / Enter: Play     S: Settings     C: Credits", {
+      .text(480, 316, "Space / Enter: Play     M: Map     S: Settings     C: Credits", {
         fontFamily: "system-ui",
         fontSize: "17px",
         color: "#e0f2fe",
@@ -82,26 +86,42 @@ export class MenuScene extends Phaser.Scene {
       repeat: -1,
       ease: "Sine.easeInOut",
     });
-    this.addButton(480, 374, 248, "Play", () => this.startGame(), 0x0f766e);
-    this.addButton(342, 432, 210, "Settings", () => this.transitionTo("SettingsScene"), 0x1d4ed8);
-    this.addButton(618, 432, 210, "Credits", () => this.transitionTo("CreditsScene"), 0x475569);
-    this.addButton(480, 490, 248, "Share Link", () => {
+    this.addButton(480, 374, 248, "Play", () => {
+      void this.startGame();
+    }, 0x0f766e);
+    this.addButton(480, 426, 248, "World Map", () => this.transitionTo("WorldMapScene", { selectedLevelIndex: this.selectedLevel }), 0x1d4ed8);
+    this.addButton(174, 482, 156, "Settings", () => this.transitionTo("SettingsScene"), 0x334155);
+    this.addButton(378, 482, 156, "Credits", () => this.transitionTo("CreditsScene"), 0x475569);
+    this.addButton(582, 482, 156, "Share", () => {
       void this.shareGame();
     }, 0xb45309);
+    this.addButton(786, 482, 156, "Feedback", () => {
+      void this.copyFeedbackNote();
+    }, 0x7c3aed);
     this.shareStatus = this.add
-      .text(480, 520, "", {
+      .text(480, 522, "", {
         fontFamily: "system-ui",
         fontSize: "14px",
         color: "#a7f3d0",
       })
       .setOrigin(0.5);
-    this.input.keyboard?.once("keydown-SPACE", () => this.startGame());
-    this.input.keyboard?.once("keydown-ENTER", () => this.startGame());
+    this.input.keyboard?.once("keydown-SPACE", () => {
+      void this.startGame();
+    });
+    this.input.keyboard?.once("keydown-ENTER", () => {
+      void this.startGame();
+    });
+    this.input.keyboard?.once("keydown-M", () => this.transitionTo("WorldMapScene", { selectedLevelIndex: this.selectedLevel }));
     this.input.keyboard?.once("keydown-S", () => this.transitionTo("SettingsScene"));
     this.input.keyboard?.once("keydown-C", () => this.transitionTo("CreditsScene"));
   }
 
-  private startGame(): void {
+  private async startGame(): Promise<void> {
+    if (this.transitioning) {
+      return;
+    }
+    this.setShareStatus("Loading level...");
+    await ensureGameplayScenes(this);
     this.transitionTo("PlayScene", { levelIndex: this.selectedLevel });
   }
 
@@ -141,10 +161,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private async shareGame(): Promise<void> {
-    const url = window.location.href;
+    const url = this.shareUrl();
     const shareData: ShareData = {
       title: "Clockwork Canopy",
-      text: "Play Clockwork Canopy in your browser.",
+      text: `Play ${getLevelMetaByIndex(this.selectedLevel).title} in Clockwork Canopy.`,
       url,
     };
 
@@ -177,5 +197,35 @@ export class MenuScene extends Phaser.Scene {
 
   private setShareStatus(status: string): void {
     this.shareStatus?.setText(status);
+  }
+
+  private async copyFeedbackNote(): Promise<void> {
+    const level = getLevelMetaByIndex(this.selectedLevel);
+    const note = [
+      `Clockwork Canopy playtest note for ${level.title}`,
+      `Link: ${this.shareUrl()}`,
+      "What felt great:",
+      "Where I got stuck:",
+      "One thing I would improve:",
+    ].join("\n");
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(note);
+        this.setShareStatus("Feedback note copied");
+        return;
+      }
+    } catch {
+      // Fall through to manual copy.
+    }
+
+    window.prompt("Copy this feedback note", note);
+    this.setShareStatus("Feedback note shown");
+  }
+
+  private shareUrl(): string {
+    const url = new URL(window.location.href);
+    url.searchParams.set("level", String(this.selectedLevel + 1));
+    return url.toString();
   }
 }

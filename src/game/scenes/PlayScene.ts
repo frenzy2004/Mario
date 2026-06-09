@@ -55,16 +55,29 @@ export class PlayScene extends Phaser.Scene {
   private startedAt = 0;
   private completed = false;
   private soundCue = "";
+  private returnScene?: "WorldMapScene";
+  private comboCount = 0;
+  private comboMultiplier = 1;
+  private comboExpiresAt = 0;
 
   constructor() {
     super("PlayScene");
   }
 
-  init(data: { levelIndex?: number }): void {
+  init(data: { levelIndex?: number; returnScene?: "WorldMapScene" }): void {
     this.level = getLevelByIndex(data.levelIndex ?? GAME_CONFIG.startingLevel);
     this.registry.set("currentLevelIndex", this.level.index);
     this.scoreState = createScoreState();
     this.completed = false;
+    this.returnScene = data.returnScene;
+    if (this.returnScene) {
+      this.registry.set("currentReturnScene", this.returnScene);
+    } else {
+      this.registry.remove("currentReturnScene");
+    }
+    this.comboCount = 0;
+    this.comboMultiplier = 1;
+    this.comboExpiresAt = 0;
   }
 
   create(): void {
@@ -181,15 +194,19 @@ export class PlayScene extends Phaser.Scene {
       const result = this.combat.handleEnemyOverlap(enemy as Phaser.GameObjects.GameObject);
       if (result === "defeated") {
         this.scoreState = addEnemyScore(this.scoreState);
+        const sprite = enemy as Phaser.GameObjects.GameObject & { x: number; y: number };
+        this.registerRewardBeat(WORLD_CONFIG.enemyScore, sprite.x, sprite.y - 24);
       } else if (result === "hurt") {
         this.damageOrRespawn(false);
       }
     });
     if (this.spawned.boss) {
       this.physics.add.overlap(this.player, this.spawned.boss, (_player, bossObject) => {
-        const result = this.combat.handleBossOverlap(bossObject as Boss);
+        const boss = bossObject as Boss;
+        const result = this.combat.handleBossOverlap(boss);
         if (result === "defeated") {
           this.scoreState = addEnemyScore(this.scoreState, true);
+          this.registerRewardBeat(WORLD_CONFIG.bossScore, boss.x, boss.y - 42);
         } else if (result === "hurt") {
           this.damageOrRespawn(false);
         }
@@ -476,6 +493,7 @@ export class PlayScene extends Phaser.Scene {
     }
     this.scoreState = addCollectibleScore(this.scoreState, collectible.kind);
     const pickup = collectible.collect();
+    this.registerRewardBeat(collectible.score, pickup?.x ?? collectible.x, (pickup?.y ?? collectible.y) - 18);
     this.motionSystem.handleFeedback({
       kind: "pickup",
       collectibleKind: collectible.kind,
@@ -518,14 +536,17 @@ export class PlayScene extends Phaser.Scene {
 
   private damageOrRespawn(applyDamage = true): void {
     if (applyDamage && !this.player.damage(this.time.now)) {
+      this.resetCombo();
       this.motionSystem.handleFeedback({ kind: "hurt", target: this.player, x: this.player.x, y: this.player.y });
       this.events.emit("audio:hurt");
       return;
     }
     if (this.player.health > 0 && !applyDamage) {
+      this.resetCombo();
       return;
     }
     this.scoreState.deaths += 1;
+    this.resetCombo();
     this.player.lives -= 1;
     if (this.player.lives < 0) {
       this.scene.start("MenuScene");
@@ -573,11 +594,17 @@ export class PlayScene extends Phaser.Scene {
     this.player.setAnimationState("victory");
     this.motionSystem.handleFeedback({ kind: "victory", target: this.player, x: this.player.x, y: this.player.y });
     this.player.setVelocity(0, 0);
-    this.saveSystem.recordCompletion(this.level.id, this.level.index, elapsedMs, this.scoreState.score);
+    const save = this.saveSystem.recordCompletion(this.level.id, this.level.index, elapsedMs, this.scoreState.score);
     const nextLevel = getNextLevel(this.level);
     this.time.delayedCall(1100, () => {
       this.scene.stop("HudScene");
-      if (!nextLevel || this.level.index >= ALL_LEVELS.length - 1) {
+      if (this.returnScene === "WorldMapScene") {
+        this.motionSystem.sceneFade("out", 180, () =>
+          this.scene.start("WorldMapScene", {
+            selectedLevelIndex: Math.min(save.unlockedLevel, ALL_LEVELS.length - 1),
+          }),
+        );
+      } else if (!nextLevel || this.level.index >= ALL_LEVELS.length - 1) {
         this.motionSystem.sceneFade("out", 180, () =>
           this.scene.start("GameCompleteScene", { score: this.scoreState.score }),
         );
@@ -590,6 +617,10 @@ export class PlayScene extends Phaser.Scene {
   private updateHud(): void {
     const elapsedSeconds = Math.floor((this.time.now - this.startedAt) / 1000);
     const settings = this.saveSystem.loadSettings();
+    if (this.time.now > this.comboExpiresAt) {
+      this.comboCount = 0;
+      this.comboMultiplier = 1;
+    }
     this.registry.set("hud", {
       levelTitle: this.level.title,
       score: this.scoreState.score,
@@ -598,7 +629,34 @@ export class PlayScene extends Phaser.Scene {
       glimmers: this.scoreState.glimmers,
       hiddenSeeds: this.scoreState.hiddenSeeds,
       timeRemaining: Math.max(0, this.level.timeLimit - elapsedSeconds),
+      combo: this.comboCount,
+      multiplier: this.comboMultiplier,
       soundCue: settings.showSoundCues ? this.soundCue : "",
     });
+  }
+
+  private registerRewardBeat(baseScore: number, x: number, y: number): void {
+    const now = this.time.now;
+    this.comboCount = now <= this.comboExpiresAt ? this.comboCount + 1 : 1;
+    this.comboExpiresAt = now + 2400;
+    this.comboMultiplier = Math.min(4, 1 + Math.floor(this.comboCount / 4));
+    if (this.comboMultiplier <= 1) {
+      return;
+    }
+
+    const bonus = Math.max(10, Math.floor(baseScore * (this.comboMultiplier - 1) * 0.18));
+    this.scoreState.score += bonus;
+    this.motionSystem.handleFeedback({
+      kind: "pickup",
+      score: bonus,
+      x,
+      y,
+    });
+  }
+
+  private resetCombo(): void {
+    this.comboCount = 0;
+    this.comboMultiplier = 1;
+    this.comboExpiresAt = 0;
   }
 }

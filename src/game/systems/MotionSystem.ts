@@ -63,6 +63,8 @@ export interface MotionTarget {
   visible?: boolean;
   active?: boolean;
   destroyed?: boolean;
+  originX?: number;
+  originY?: number;
   scene?: unknown;
   texture?: { key?: string };
   frame?: { name?: string | number };
@@ -469,7 +471,7 @@ export class MotionSystem {
         options.texture ?? texture,
         options.frame ?? target.frame?.name,
       );
-      ghost.setOrigin?.(0.5, 0.5);
+      ghost.setOrigin?.(finiteNumber(target.originX, 0.5), finiteNumber(target.originY, 0.5));
       setTargetScale(ghost, baseScale, baseScale);
       setTargetAlpha(ghost, (options.alpha ?? 0.34) / progress);
       setDepth(ghost, options.depth ?? ((target.depth ?? 0) + (options.depthOffset ?? -1)));

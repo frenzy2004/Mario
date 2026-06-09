@@ -34,6 +34,16 @@ describe("SaveSystem", () => {
     expect(improved.bestTimes["level-01"]).toBe(11_000);
   });
 
+  it("keeps later unlocks when replaying earlier levels", () => {
+    const saveSystem = new SaveSystem();
+    saveSystem.recordCompletion("level-04", 3, 32_000, 9000);
+
+    const replay = saveSystem.recordCompletion("level-01", 0, 10_000, 2500);
+
+    expect(replay.unlockedLevel).toBe(4);
+    expect(replay.bestTimes["level-01"]).toBe(10_000);
+  });
+
   it("sanitizes motion, reduced shake, and touch-control preferences", () => {
     expect(
       sanitizeSettings({

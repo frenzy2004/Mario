@@ -203,7 +203,7 @@ function drawHeroFrame(
 }
 
 function getHeroPose(state: PlayerAnimationState, frame: number): HeroPose {
-  const runStep = frame % 4 === 0 || frame % 4 === 3 ? 1 : -1;
+  const runStep = Math.sin((frame / Math.max(1, PLAYER_ANIMATIONS.run.frames)) * Math.PI * 2);
   const idleBob = Math.sin(frame * 0.72) * 0.55;
   const pose: HeroPose = {
     bob: idleBob,
@@ -221,11 +221,11 @@ function getHeroPose(state: PlayerAnimationState, frame: number): HeroPose {
 
   switch (state) {
     case "run":
-      pose.bob = frame % 2 === 0 ? -0.6 : 0.35;
+      pose.bob = Math.abs(runStep) > 0.72 ? -0.7 : 0.42;
       pose.lean = 1.4;
       pose.bodyWidth = 18;
-      pose.scarfFlutter = 3 + (frame % 3);
-      pose.coatFlutter = 2 + Math.abs(runStep);
+      pose.scarfFlutter = 3.2 + Math.abs(runStep) * 2;
+      pose.coatFlutter = 2 + Math.abs(runStep) * 1.6;
       break;
     case "skid":
       pose.bob = 0.9;
@@ -325,12 +325,14 @@ function drawHeroBody(
   const trimColor = state === "victory" ? HERO_COLORS.brass : HERO_COLORS.coatLight;
 
   graphics.fillStyle(HERO_COLORS.outlineSoft, 1);
-  graphics.fillCircle(centerX + 8, coatTop + 7, 5);
+  graphics.fillCircle(centerX + 8, coatTop + 7, 6);
   graphics.fillStyle(0x334155, 1);
-  graphics.fillCircle(centerX + 8, coatTop + 7, 3);
+  graphics.fillCircle(centerX + 8, coatTop + 7, 4);
   graphics.fillStyle(HERO_COLORS.brass, 1);
   graphics.fillRect(centerX + 7, coatTop + 4, 2, 6);
   graphics.fillRect(centerX + 5, coatTop + 6, 6, 2);
+  graphics.fillStyle(0xfde68a, 0.85);
+  graphics.fillRect(centerX + 10, coatTop + 5, 2, 2);
 
   graphics.fillStyle(HERO_COLORS.outline, 1);
   graphics.fillRoundedRect(coatLeft - 1, coatTop - 1, pose.bodyWidth + 2, pose.bodyHeight + 3, 6);
@@ -378,11 +380,11 @@ function drawHeroScarf(
 ): void {
   const scarfY = 14 + pose.bob;
   const flutter = pose.scarfFlutter + (frame % 2) * 0.6;
-  const tailX = state === "dash" ? -4 : state === "skid" ? 1 : 3;
+  const tailX = state === "dash" ? 0 : state === "skid" ? 1 : state === "run" ? 2 : 3;
   graphics.fillStyle(0x7f1d1d, 1);
-  graphics.fillTriangle(10 + pose.lean * 0.2, scarfY, tailX, scarfY + 2 + flutter, 10, scarfY + 6);
+  graphics.fillTriangle(10 + pose.lean * 0.2, scarfY, tailX, scarfY + 1 + flutter, 10, scarfY + 7);
   graphics.fillStyle(HERO_COLORS.scarf, 1);
-  graphics.fillTriangle(10 + pose.lean * 0.2, scarfY, tailX + 2, scarfY + 2 + flutter, 10, scarfY + 5);
+  graphics.fillTriangle(10 + pose.lean * 0.2, scarfY, tailX + 2, scarfY + 1 + flutter, 10, scarfY + 6);
   graphics.fillStyle(HERO_COLORS.scarfLight, 1);
   graphics.fillTriangle(10, scarfY + 1, tailX + 4, scarfY + 2 + flutter, 10, scarfY + 3);
   graphics.fillStyle(0x7f1d1d, 1);
@@ -463,8 +465,8 @@ function drawHeroLegs(
   let legLean = 0;
 
   if (state === "run") {
-    leftBootX += pose.runStep * 3;
-    rightBootX -= pose.runStep * 3;
+    leftBootX += pose.runStep * 4;
+    rightBootX -= pose.runStep * 4;
     leftBootY += pose.runStep > 0 ? 0 : -1;
     rightBootY += pose.runStep > 0 ? -1 : 0;
   } else if (state === "skid") {
@@ -510,6 +512,8 @@ function drawHeroLegs(
 }
 
 function drawHeroBoot(graphics: Phaser.GameObjects.Graphics, x: number, y: number, width: number): void {
+  graphics.fillStyle(HERO_COLORS.outline, 1);
+  graphics.fillRoundedRect(x - 1, y - 1, width + 2, 7, 2);
   graphics.fillStyle(HERO_COLORS.boot, 1);
   graphics.fillRoundedRect(x, y, width, 5, 2);
   graphics.fillStyle(HERO_COLORS.bootLight, 1);
@@ -539,9 +543,11 @@ function drawHeroHead(
   graphics.fillRect(centerX + 2, headY, 5, 2);
 
   graphics.fillStyle(HERO_COLORS.leaf, 1);
-  graphics.fillEllipse(centerX + 4, headY - 1, 8, 4);
+  graphics.fillEllipse(centerX + 5, headY - 2, 11, 5);
+  graphics.fillStyle(0x166534, 1);
+  graphics.fillEllipse(centerX - 2, headY - 2, 7, 3);
   graphics.fillStyle(0xecfccb, 0.9);
-  graphics.fillRect(centerX + 3, headY - 1, 3, 1);
+  graphics.fillRect(centerX + 3, headY - 2, 5, 1);
 
   graphics.fillStyle(0xd6a33f, 1);
   graphics.fillRoundedRect(centerX - 6, headY + 4, 14, 5, 2);
@@ -563,10 +569,14 @@ function drawHeroHead(
 
   graphics.fillStyle(state === "victory" ? HERO_COLORS.brass : HERO_COLORS.hair, 1);
   if (state === "hurt") {
-    graphics.fillRect(centerX - 2, headY + 10, 5, 1);
+    graphics.fillRect(centerX - 3, headY + 10, 6, 1);
   } else if (state === "victory") {
     graphics.fillRect(centerX - 2, headY + 10, 4, 1);
     graphics.fillRect(centerX + 2, headY + 9, 1, 1);
+  } else if (state === "dash") {
+    graphics.fillRect(centerX - 1, headY + 9, 5, 1);
+  } else if (state === "jump") {
+    graphics.fillRect(centerX, headY + 10, 3, 1);
   } else {
     graphics.fillRect(centerX - 1, headY + 10, 4, 1);
   }
@@ -579,12 +589,6 @@ function drawHeroGlider(
   frame: number,
 ): void {
   if (state !== "glide") {
-    if (state === "fall" || state === "jump") {
-      graphics.fillStyle(HERO_COLORS.leaf, 0.8);
-      graphics.fillEllipse(24 + pose.lean * 0.25, 15 + pose.bob, 7, 11);
-      graphics.lineStyle(1, 0xecfccb, 0.6);
-      graphics.lineBetween(24 + pose.lean * 0.25, 10 + pose.bob, 24 + pose.lean * 0.25, 20 + pose.bob);
-    }
     return;
   }
 
@@ -615,6 +619,13 @@ function drawHeroStateEffects(
   if (state === "jump") {
     graphics.fillStyle(HERO_COLORS.dash, 0.55);
     graphics.fillEllipse(16, 32, 10 + frame * 2, 3);
+    graphics.fillStyle(0xecfccb, 0.72);
+    graphics.fillRect(18, 9 + pose.bob, 5, 1);
+  }
+  if (state === "fall") {
+    graphics.fillStyle(0x38bdf8, 0.45);
+    graphics.fillRect(7, 12 + pose.bob, 3, 1);
+    graphics.fillRect(24, 14 + pose.bob, 3, 1);
   }
   if (state === "dash") {
     graphics.fillStyle(0xecfccb, 0.75);

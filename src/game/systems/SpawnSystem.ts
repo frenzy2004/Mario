@@ -94,7 +94,6 @@ export class SpawnSystem {
       boss.emitMotionCue("spawn", this.scene.time.now, { durationMs: 420, intensity: 1.2 });
       goal.lock();
       boss.once("destroy", () => goal.unlock());
-      this.scene.events.once("boss:defeated", () => goal.unlock());
     }
 
     return { enemies, collectibles, powerups, movingPlatforms, hazards, checkpoints, goal, boss };

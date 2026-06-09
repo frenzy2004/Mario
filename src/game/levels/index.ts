@@ -5,6 +5,16 @@ export const ALL_LEVELS: LevelDefinition[] = LEVEL_DEFINITIONS;
 export type { LevelDefinition };
 export { FRIEND_READY_LEVEL_COUNT, applyFriendReadiness, polishFriendReadyLevel } from "./friendReadiness";
 export {
+  LEVEL_COUNT,
+  LEVEL_META,
+  clampLevelIndex,
+  clampUnlockedLevel,
+  getLevelMetaByIndex,
+  levelIndexFromSearch,
+  levelIsUnlocked,
+  type LevelMeta,
+} from "./meta";
+export {
   getLevelContentSummary,
   validateCampaignLevel,
   validateCampaignLevels,
