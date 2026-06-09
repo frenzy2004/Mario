@@ -28,6 +28,19 @@ npm.cmd run test:e2e
 - Jump: `Space`, `W`, `ArrowUp`, or gamepad bottom face button
 - Dash: `Shift`, `X`, or gamepad right face button
 - Pause: `Esc`, `Enter`, or gamepad Start/Menu
+- Touch: phones and tablets show left/right, Jump, and Dash controls automatically. Use Settings -> Touch controls to force them on or off.
+
+## Friend Play
+
+Use the title-screen Share Link button to send the current game URL. Browsers with Web Share open the native share sheet; other browsers copy the link to the clipboard or show a copy prompt.
+
+For someone on the same Wi-Fi network to play a local dev build, run Vite on all interfaces:
+
+```powershell
+npm.cmd run dev -- --host 0.0.0.0
+```
+
+Then share the Network URL printed by Vite, usually `http://<your-lan-ip>:5173/`. Keep both devices on the same network and allow the dev server through the firewall if Windows asks.
 
 ## Originality
 
