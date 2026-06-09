@@ -877,6 +877,15 @@ const polishChecks: PolishRegressionCheck[] = [
       }
     },
   },
+  {
+    name: "keeps powerup cadence across the campaign",
+    run: (levels) => {
+      for (const level of levels) {
+        expect(level.powerups.length).toBeGreaterThanOrEqual(level.id === "final-crown" ? 14 : 5);
+        expect(level.springs.length).toBeGreaterThanOrEqual(level.id === "final-crown" ? 10 : 5);
+      }
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
