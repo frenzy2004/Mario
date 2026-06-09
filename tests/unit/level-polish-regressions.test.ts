@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import { ALL_LEVELS } from "../../src/game/levels/generated";
+import type { LevelDefinition } from "../../src/game/levels/schema";
+import { getLevelContentSummary } from "../../src/game/levels/schema";
+
+type PolishRegressionCheck = {
+  name: string;
+  run: (levels: readonly LevelDefinition[]) => void;
+};
+
+const polishChecks: PolishRegressionCheck[] = [
+  {
+    name: "keeps level-01 readability pickups visible",
+    run: (levels) => {
+      const level = getLevel(levels, "level-01");
+      const summary = getLevelContentSummary(level);
+      expect(summary.collectibleCount).toBeGreaterThanOrEqual(62);
+      expect(level.decorations.length).toBeGreaterThanOrEqual(180);
+    },
+  },
+];
+
+function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
+  const level = levels.find((candidate) => candidate.id === id);
+  expect(level, `missing generated level: ${id}`).toBeDefined();
+  return level as LevelDefinition;
+}
+
+describe("generated level polish regressions", () => {
+  for (const check of polishChecks) {
+    it(check.name, () => {
+      check.run(ALL_LEVELS);
+    });
+  }
+});
