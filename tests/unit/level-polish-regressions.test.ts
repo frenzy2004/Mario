@@ -90,6 +90,15 @@ const polishChecks: PolishRegressionCheck[] = [
       expect(level.decorations.length).toBeGreaterThanOrEqual(180);
     },
   },
+  {
+    name: "keeps level-10 readability pickups visible",
+    run: (levels) => {
+      const level = getLevel(levels, "level-10");
+      const summary = getLevelContentSummary(level);
+      expect(summary.collectibleCount).toBeGreaterThanOrEqual(62);
+      expect(level.decorations.length).toBeGreaterThanOrEqual(180);
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
