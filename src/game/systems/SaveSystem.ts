@@ -39,6 +39,8 @@ export interface SaveData {
 
 export type InputMode = "auto" | "keyboard" | "gamepad";
 export type Difficulty = "story" | "normal" | "expert";
+export type MotionLevel = "full" | "reduced" | "minimal";
+export type TouchControlsPreference = "auto" | "on" | "off";
 
 export interface KeyBindings {
   left: string;
@@ -61,9 +63,11 @@ export interface GameSettings {
   muted: boolean;
   fullscreen: boolean;
   reducedMotion: boolean;
+  motionLevel: MotionLevel;
   highContrast: boolean;
   screenShake: boolean;
   showTimer: boolean;
+  touchControls: TouchControlsPreference;
   inputMode: InputMode;
   difficulty: Difficulty;
   keyBindings: KeyBindings;
@@ -107,9 +111,11 @@ export const DEFAULT_SETTINGS: GameSettings = {
   muted: false,
   fullscreen: false,
   reducedMotion: false,
+  motionLevel: "full",
   highContrast: false,
   screenShake: true,
   showTimer: true,
+  touchControls: "auto",
   inputMode: "auto",
   difficulty: "normal",
   keyBindings: DEFAULT_KEY_BINDINGS,
@@ -284,6 +290,12 @@ export function sanitizeSettings(value: unknown): GameSettings {
   const masterVolume = clamp01(record.masterVolume, legacyVolume);
   const reduceShake = bool(record.reduceShake, bool(record.reducedMotion, DEFAULT_SETTINGS.reduceShake));
   const screenShake = bool(record.screenShake, !reduceShake);
+  const legacyReducedMotion = bool(record.reducedMotion, reduceShake);
+  const motionLevel = enumValue(
+    record.motionLevel,
+    ["full", "reduced", "minimal"],
+    legacyReducedMotion || reduceShake ? "reduced" : DEFAULT_SETTINGS.motionLevel,
+  );
 
   return {
     volume: legacyVolume,
@@ -295,10 +307,16 @@ export function sanitizeSettings(value: unknown): GameSettings {
     sfxVolume: clamp01(record.sfxVolume, masterVolume),
     muted: bool(record.muted, DEFAULT_SETTINGS.muted),
     fullscreen: bool(record.fullscreen, DEFAULT_SETTINGS.fullscreen),
-    reducedMotion: bool(record.reducedMotion, reduceShake),
+    reducedMotion: legacyReducedMotion || motionLevel !== "full",
+    motionLevel,
     highContrast: bool(record.highContrast, DEFAULT_SETTINGS.highContrast),
-    screenShake,
+    screenShake: motionLevel === "minimal" ? false : screenShake,
     showTimer: bool(record.showTimer, DEFAULT_SETTINGS.showTimer),
+    touchControls: enumValue(
+      record.touchControls,
+      ["auto", "on", "off"],
+      DEFAULT_SETTINGS.touchControls,
+    ),
     inputMode: enumValue(record.inputMode, ["auto", "keyboard", "gamepad"], DEFAULT_SETTINGS.inputMode),
     difficulty: enumValue(record.difficulty, ["story", "normal", "expert"], DEFAULT_SETTINGS.difficulty),
     keyBindings: sanitizeKeyBindings(record.keyBindings),
