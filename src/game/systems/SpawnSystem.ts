@@ -90,6 +90,8 @@ export class SpawnSystem {
       : undefined;
 
     if (boss) {
+      this.scene.events.emit("spawn:boss", boss, level.boss);
+      boss.emitMotionCue("spawn", this.scene.time.now, { durationMs: 420, intensity: 1.2 });
       goal.lock();
       boss.once("destroy", () => goal.unlock());
       this.scene.events.once("boss:defeated", () => goal.unlock());
@@ -101,6 +103,7 @@ export class SpawnSystem {
   spawnEnemy(definition: EnemyDefinition): Enemy {
     const enemy = new Enemy(this.scene, definition);
     this.scene.events.emit("spawn:enemy", enemy, definition);
+    enemy.emitMotionCue("spawn", this.scene.time.now, { durationMs: 220, intensity: 0.8 });
     return enemy;
   }
 

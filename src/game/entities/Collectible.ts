@@ -48,6 +48,18 @@ export const COLLECTIBLE_DEFINITIONS: Record<CollectibleKind, CollectibleDefinit
   },
 };
 
+const COLLECTIBLE_POPUP_COLORS: Record<CollectibleKind, string> = {
+  glimmer: "#fff7ad",
+  largeCog: "#fde68a",
+  hiddenSeed: "#bbf7d0",
+};
+
+const COLLECTIBLE_ARC_TINTS: Record<CollectibleKind, number> = {
+  glimmer: 0xfff7ad,
+  largeCog: 0xfacc15,
+  hiddenSeed: 0x86efac,
+};
+
 interface NormalizedCollectibleDefinition extends CollectibleDefinition {
   texture?: string;
 }
@@ -154,23 +166,78 @@ export class Collectible extends Phaser.Physics.Arcade.Sprite {
     };
 
     this.scene.events.emit("collectible:collected", pickup);
+    this.scene.tweens.killTweensOf(this);
     this.disableBody(true, false);
-    this.scene.tweens.add({
-      targets: this,
-      scale: 1.8,
-      alpha: 0,
-      duration: 180,
-      onComplete: () => this.destroy(),
-    });
+    this.playPickupArc(pickup);
     return pickup;
   }
 
   resetCollectible(): void {
+    this.scene.tweens.killTweensOf(this);
     this.collected = false;
     this.setPosition(this.x, this.baseY);
     this.setAlpha(this.kind === "hiddenSeed" ? 0.55 : 1);
     this.setScale(1);
+    this.setAngle(0);
+    this.setVisible(true);
+    this.clearTint();
+    this.setBlendMode(Phaser.BlendModes.NORMAL);
     this.enableBody(true, this.x, this.baseY, true, true);
+  }
+
+  private playPickupArc(pickup: CollectiblePickup): void {
+    const tint = COLLECTIBLE_ARC_TINTS[this.kind];
+    const scoreText = this.scene.add
+      .text(pickup.x, pickup.y - 24, `+${pickup.score}`, {
+        fontFamily: "system-ui",
+        fontSize: this.kind === "largeCog" ? "18px" : "15px",
+        fontStyle: "700",
+        color: COLLECTIBLE_POPUP_COLORS[this.kind],
+        stroke: "#07131e",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(86);
+    const ring = this.scene.add
+      .ellipse(pickup.x, pickup.y, 20, 20)
+      .setStrokeStyle(2, tint, 0.75)
+      .setDepth(84);
+
+    this.setVisible(true);
+    this.setDepth(85);
+    this.setAlpha(1);
+    this.setTint(tint);
+    this.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.scene.tweens.add({
+      targets: this,
+      x: pickup.x + Phaser.Math.Between(-16, 16),
+      y: pickup.y - Phaser.Math.Between(38, 54),
+      angle: this.angle + Phaser.Math.Between(130, 220),
+      scaleX: 0.28,
+      scaleY: 0.28,
+      alpha: 0,
+      duration: 320,
+      ease: "Cubic.easeOut",
+      onComplete: () => this.destroy(),
+    });
+    this.scene.tweens.add({
+      targets: scoreText,
+      y: pickup.y - 58,
+      scale: 1.14,
+      alpha: 0,
+      duration: 620,
+      ease: "Cubic.easeOut",
+      onComplete: () => scoreText.destroy(),
+    });
+    this.scene.tweens.add({
+      targets: ring,
+      scale: 2.2,
+      alpha: 0,
+      duration: 360,
+      ease: "Cubic.easeOut",
+      onComplete: () => ring.destroy(),
+    });
   }
 }
 

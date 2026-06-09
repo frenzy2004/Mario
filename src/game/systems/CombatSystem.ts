@@ -18,7 +18,7 @@ export class CombatSystem {
       return "none";
     }
     if (enemy.stompable && isStomp(this.player, enemy)) {
-      enemy.defeat();
+      enemy.defeat(this.player);
       this.controller.bounce();
       this.scene.events.emit("audio:enemy");
       this.scene.events.emit("fx:spark", enemy.x, enemy.y);
@@ -36,7 +36,7 @@ export class CombatSystem {
       return "none";
     }
     if (isStomp(this.player, boss)) {
-      const defeated = boss.hit();
+      const defeated = boss.hit({ source: this.player, sourceX: this.player.x, knockback: 180 });
       this.controller.bounce(-520);
       this.scene.events.emit("audio:boss");
       this.scene.events.emit("fx:spark", boss.x, boss.y - 30);

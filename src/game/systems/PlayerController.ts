@@ -1,5 +1,14 @@
 import Phaser from "phaser";
-import { PLAYER_CONFIG } from "../config/player";
+import {
+  PLAYER_CONFIG,
+  PLAYER_MOTION_EVENTS,
+  createPlayerDashTrailCue,
+  createPlayerMotionCueEvent,
+  createPlayerSquashStretchCue,
+  type PlayerFacing,
+  type PlayerMotionCueName,
+  type PlayerSquashStretchCue,
+} from "../config/player";
 import { Player } from "../entities/Player";
 import type { InputSnapshot } from "./InputSystem";
 
@@ -8,6 +17,7 @@ export interface PlayerControllerState {
   jumpBufferedAt: number;
   dashStartedAt: number;
   dashAvailableAt: number;
+  landAnimationUntil: number;
   wasGrounded: boolean;
 }
 
@@ -17,6 +27,7 @@ export class PlayerController {
     jumpBufferedAt: Number.NEGATIVE_INFINITY,
     dashStartedAt: Number.NEGATIVE_INFINITY,
     dashAvailableAt: 0,
+    landAnimationUntil: Number.NEGATIVE_INFINITY,
     wasGrounded: false,
   };
 
@@ -39,10 +50,20 @@ export class PlayerController {
     this.applyJump(snapshot, time, grounded);
     this.applyDash(snapshot, time);
     this.applyGlider(snapshot, time);
+    const landedHard =
+      !this.state.wasGrounded &&
+      grounded &&
+      Math.abs(body.velocity.y) > PLAYER_CONFIG.landingDustVelocity;
+    if (landedHard) {
+      this.state.landAnimationUntil = time + PLAYER_CONFIG.landStateMs;
+    }
     this.applyAnimation(snapshot, time, grounded);
 
-    if (!this.state.wasGrounded && grounded && Math.abs(body.velocity.y) > PLAYER_CONFIG.landingDustVelocity) {
+    if (landedHard) {
+      this.emitMotionCue("land", time, { durationMs: PLAYER_CONFIG.landStateMs, intensity: 0.82 });
+      this.emitSquashStretch("land", time);
       this.scene.events.emit("fx:dust", this.player.x, this.player.y, "land");
+      this.scene.events.emit("feedback", { kind: "land", target: this.player, x: this.player.x, y: this.player.y });
       this.scene.events.emit("audio:land");
     }
     this.state.wasGrounded = grounded;
@@ -51,6 +72,8 @@ export class PlayerController {
   bounce(force: number = PLAYER_CONFIG.bounceVelocity): void {
     this.player.setVelocityY(force);
     this.state.lastGroundedAt = Number.NEGATIVE_INFINITY;
+    this.emitMotionCue("jump", this.scene.time.now, { intensity: 0.74 });
+    this.emitSquashStretch("jump", this.scene.time.now);
   }
 
   private applyHorizontalMovement(
@@ -86,7 +109,7 @@ export class PlayerController {
       maxSpeed,
     );
     this.player.setVelocityX(nextVelocity);
-    this.player.setFlipX(direction < 0);
+    this.player.setFacing(direction < 0 ? "left" : "right");
   }
 
   private applyJump(snapshot: InputSnapshot, time: number, grounded: boolean): void {
@@ -99,7 +122,10 @@ export class PlayerController {
       this.player.setVelocityY(jumpVelocity);
       this.state.jumpBufferedAt = Number.NEGATIVE_INFINITY;
       this.state.lastGroundedAt = Number.NEGATIVE_INFINITY;
+      this.emitMotionCue("jump", time, { intensity: this.player.hasSpringBoots(time) ? 1.12 : 0.9 });
+      this.emitSquashStretch("jump", time);
       this.scene.events.emit("fx:dust", this.player.x, this.player.y, "jump");
+      this.scene.events.emit("feedback", { kind: "jump", target: this.player, x: this.player.x, y: this.player.y });
       this.scene.events.emit("audio:jump");
     }
     if (snapshot.jumpReleased && this.player.arcadeBody.velocity.y < PLAYER_CONFIG.minJumpVelocity) {
@@ -115,7 +141,12 @@ export class PlayerController {
     this.player.setVelocityX(direction * PLAYER_CONFIG.maxDashSpeed);
     this.state.dashStartedAt = time;
     this.state.dashAvailableAt = time + PLAYER_CONFIG.dashCooldownMs;
+    const facing: PlayerFacing = direction < 0 ? "left" : "right";
+    this.emitMotionCue("dash", time, { durationMs: PLAYER_CONFIG.dashMs, intensity: 1.16 });
+    this.emitSquashStretch("dash", time);
+    this.emitDashTrail(facing, time);
     this.scene.events.emit("fx:dust", this.player.x - direction * 10, this.player.y, "dash");
+    this.scene.events.emit("feedback", { kind: "dash", target: this.player, x: this.player.x, y: this.player.y });
     this.scene.events.emit("audio:dash");
   }
 
@@ -135,7 +166,11 @@ export class PlayerController {
     if (!this.player.hasControl) {
       return;
     }
-    if (body.velocity.y < -35 && !grounded) {
+    if (time < this.player.hurtAnimationUntil) {
+      this.player.setAnimationState("hurt");
+    } else if (grounded && time < this.state.landAnimationUntil) {
+      this.player.setAnimationState("land");
+    } else if (body.velocity.y < -35 && !grounded) {
       this.player.setAnimationState("jump");
     } else if (body.velocity.y > 55 && !grounded) {
       this.player.setAnimationState("fall");
@@ -151,5 +186,45 @@ export class PlayerController {
     } else {
       this.player.setAnimationState("idle");
     }
+  }
+
+  private emitSquashStretch(cue: PlayerSquashStretchCue, time: number): void {
+    this.scene.events.emit(PLAYER_MOTION_EVENTS.squashStretch, {
+      ...createPlayerSquashStretchCue(cue),
+      facing: this.player.facing,
+      target: this.player,
+      time,
+      x: this.player.x,
+      y: this.player.y,
+    });
+  }
+
+  private emitDashTrail(facing: PlayerFacing, time: number): void {
+    this.scene.events.emit(PLAYER_MOTION_EVENTS.dashTrail, {
+      ...createPlayerDashTrailCue(facing),
+      target: this.player,
+      time,
+      x: this.player.x,
+      y: this.player.y,
+    });
+  }
+
+  private emitMotionCue(
+    cue: PlayerMotionCueName,
+    time: number,
+    options: Partial<Pick<ReturnType<typeof createPlayerMotionCueEvent>, "durationMs" | "intensity" | "source">> = {},
+  ): void {
+    const event = createPlayerMotionCueEvent({
+      cue,
+      facing: this.player.facing,
+      health: this.player.health,
+      x: this.player.x,
+      y: this.player.y,
+      at: time,
+      ...options,
+    });
+    this.player.setData("motionCue", event);
+    this.scene.events.emit(PLAYER_MOTION_EVENTS.playerMotion, event, this.player);
+    this.scene.events.emit(PLAYER_MOTION_EVENTS.cue, event, this.player);
   }
 }

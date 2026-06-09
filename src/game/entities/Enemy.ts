@@ -36,6 +36,33 @@ export interface EnemyDamageHit {
   ignoreInvulnerability?: boolean;
 }
 
+export type EnemyTellKind = "hop-crouch" | "charge-windup" | "turret-lock";
+export type EnemyMotionCueName = "spawn" | "tell" | "attack" | "hit" | "defeat";
+
+export interface EnemyTellProfile {
+  tell: EnemyTellKind;
+  durationMs: number;
+  intensity: number;
+}
+
+export interface EnemyMotionCueEvent {
+  scope: "enemy";
+  cue: EnemyMotionCueName;
+  enemyId: string;
+  kind: EnemyKind;
+  behavior: EnemyBehavior;
+  x: number;
+  y: number;
+  direction: -1 | 1;
+  health: number;
+  maxHealth: number;
+  at: number;
+  durationMs: number;
+  intensity: number;
+  tell?: EnemyTellKind;
+  source?: unknown;
+}
+
 export const ENEMY_STATS: Record<EnemyKind, EnemyStats> = {
   beetle: {
     kind: "beetle",
@@ -111,6 +138,12 @@ export const ENEMY_STATS: Record<EnemyKind, EnemyStats> = {
   },
 };
 
+export const ENEMY_TELL_PROFILES: Partial<Record<EnemyKind, EnemyTellProfile>> = {
+  acorn: { tell: "hop-crouch", durationMs: 150, intensity: 0.85 },
+  charger: { tell: "charge-windup", durationMs: 260, intensity: 1.2 },
+  turret: { tell: "turret-lock", durationMs: 340, intensity: 1.1 },
+};
+
 type TrackableTarget = Phaser.GameObjects.GameObject & { x: number; y: number; active?: boolean };
 
 interface NormalizedEnemyDefinition extends EnemyDefinition {
@@ -141,6 +174,11 @@ export function animationFor(kind: EnemyKind): string {
     default:
       return "beetle-walk";
   }
+}
+
+export function getEnemyTellProfile(kind: EnemyKind): EnemyTellProfile | null {
+  const profile = ENEMY_TELL_PROFILES[kind];
+  return profile ? { ...profile } : null;
 }
 
 function normalizeDefinition(
@@ -184,6 +222,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private direction = 1;
   private nextActionAt = 0;
   private invulnerableUntil = 0;
+  private activeTell?: EnemyTellKind;
+  private tellEndsAt = 0;
+  private chargeReadyUntil = 0;
   private target?: TrackableTarget;
 
   constructor(scene: Phaser.Scene, definition: EnemyDefinition);
@@ -208,6 +249,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setData("enemyKind", definition.kind);
     this.setData("damage", this.damage);
     this.setData("scoreValue", this.scoreValue);
+    this.setData("motionCue", null);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setOrigin(0.5, 1);
@@ -235,6 +277,34 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return this;
   }
 
+  emitMotionCue(
+    cue: EnemyMotionCueName,
+    time = this.scene.time.now,
+    options: Partial<Pick<EnemyMotionCueEvent, "durationMs" | "intensity" | "tell" | "source">> = {},
+  ): EnemyMotionCueEvent {
+    const event: EnemyMotionCueEvent = {
+      scope: "enemy",
+      cue,
+      enemyId: this.enemyId,
+      kind: this.kind,
+      behavior: this.stats.behavior,
+      x: this.x,
+      y: this.y,
+      direction: this.direction < 0 ? -1 : 1,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      at: time,
+      durationMs: options.durationMs ?? 0,
+      intensity: options.intensity ?? 1,
+      tell: options.tell,
+      source: options.source,
+    };
+    this.setData("motionCue", event);
+    this.scene.events.emit("enemy:motion", event, this);
+    this.scene.events.emit("motion:cue", event, this);
+    return event;
+  }
+
   updateEnemy(time: number): void {
     if (!this.active || this.defeated) {
       return;
@@ -246,11 +316,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     switch (this.stats.behavior) {
       case "hop":
-        this.updatePatrol(0.85);
-        if (this.arcadeBody.blocked.down && time > this.nextActionAt) {
-          this.setVelocityY(-330);
-          this.nextActionAt = time + 900 + this.definition.phase * 20;
-        }
+        this.updateHop(time);
         break;
       case "fly":
         this.updatePatrol(1);
@@ -288,13 +354,20 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.invulnerableUntil = now + 180;
     this.setTint(0xfef08a);
 
+    let hitDirection: -1 | 1 = this.direction < 0 ? -1 : 1;
     if (typeof hit.sourceX === "number") {
       const knockbackDirection = this.x < hit.sourceX ? -1 : 1;
+      hitDirection = knockbackDirection;
       this.setVelocityX(knockbackDirection * (hit.knockback ?? 120));
     }
 
-    this.scene.events.emit("enemy:damaged", this, amount, hit);
-    if (this.health <= 0) {
+    const defeated = this.health <= 0;
+    const cue = this.emitMotionCue("hit", now, { durationMs: 160, intensity: Math.max(1, amount), source: hit.source });
+    if (!defeated) {
+      this.playHitMotion(hitDirection);
+    }
+    this.scene.events.emit("enemy:damaged", this, amount, hit, cue);
+    if (defeated) {
       return this.defeat(hit.source);
     }
     return true;
@@ -307,7 +380,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     this.defeated = true;
     this.health = 0;
-    this.scene.events.emit("enemy:defeated", this, source);
+    this.scene.tweens.killTweensOf(this);
+    const cue = this.emitMotionCue("defeat", this.scene.time.now, { durationMs: 180, intensity: 1.35, source });
+    this.scene.events.emit("enemy:defeated", this, source, cue);
     this.disableBody(true, false);
     this.scene.tweens.add({
       targets: this,
@@ -323,6 +398,32 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   isHazardous(): boolean {
     return this.active && !this.defeated;
+  }
+
+  private updateHop(time: number): void {
+    this.updatePatrol(0.85);
+
+    if (this.activeTell === "hop-crouch") {
+      if (time < this.tellEndsAt) {
+        this.setVelocityX(this.definition.speed * 0.22 * this.direction);
+        return;
+      }
+      this.clearTell();
+      this.setVelocityY(-330);
+      this.nextActionAt = time + 900 + this.definition.phase * 20;
+      return;
+    }
+
+    if (this.arcadeBody.blocked.down && time > this.nextActionAt) {
+      const profile = getEnemyTellProfile(this.kind);
+      if (profile) {
+        this.beginTell(profile, time);
+        this.setVelocityX(this.definition.speed * 0.22 * this.direction);
+        return;
+      }
+      this.setVelocityY(-330);
+      this.nextActionAt = time + 900 + this.definition.phase * 20;
+    }
   }
 
   private updatePatrol(speedScale: number): void {
@@ -343,10 +444,30 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     if (seesTarget && this.target) {
       this.direction = this.target.x < this.x ? -1 : 1;
+      if (this.activeTell === "charge-windup") {
+        if (time < this.tellEndsAt) {
+          this.setVelocityX(0);
+          return;
+        }
+        this.clearTell();
+        this.chargeReadyUntil = time + 700;
+      }
+      if (time > this.chargeReadyUntil) {
+        const profile = getEnemyTellProfile(this.kind);
+        if (profile) {
+          this.beginTell(profile, time);
+          this.setVelocityX(0);
+          return;
+        }
+      }
       this.setVelocityX(this.definition.speed * 1.75 * this.direction);
       return;
     }
 
+    if (this.activeTell === "charge-windup") {
+      this.clearTell();
+    }
+    this.chargeReadyUntil = 0;
     if (time > this.nextActionAt) {
       this.direction *= -1;
       this.nextActionAt = time + 1500;
@@ -356,17 +477,87 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private updateTurret(time: number): void {
     this.setVelocityX(0);
+    if (this.activeTell === "turret-lock") {
+      if (time < this.tellEndsAt) {
+        return;
+      }
+      this.clearTell();
+      this.fireTurret(time);
+      return;
+    }
+
     if (time <= this.nextActionAt) {
       return;
     }
 
+    const profile = getEnemyTellProfile(this.kind);
+    if (profile) {
+      this.beginTell(profile, time);
+      return;
+    }
+    this.fireTurret(time);
+  }
+
+  private fireTurret(time: number): void {
     this.nextActionAt = time + 1500 + this.definition.phase * 15;
+    const direction = this.target && this.target.x < this.x ? -1 : 1;
+    this.emitMotionCue("attack", time, { durationMs: 120, intensity: 1, tell: "turret-lock" });
     this.scene.events.emit("enemy:turret-fire", {
       enemy: this,
       x: this.x,
       y: this.y - 16,
-      direction: this.target && this.target.x < this.x ? -1 : 1,
+      direction,
       damage: this.damage,
+    });
+  }
+
+  private beginTell(profile: EnemyTellProfile, time: number): void {
+    this.activeTell = profile.tell;
+    this.tellEndsAt = time + profile.durationMs;
+    const cue = this.emitMotionCue("tell", time, {
+      durationMs: profile.durationMs,
+      intensity: profile.intensity,
+      tell: profile.tell,
+    });
+    this.scene.events.emit("enemy:tell", cue, this);
+    this.playTellMotion(profile);
+  }
+
+  private clearTell(): void {
+    this.activeTell = undefined;
+    this.tellEndsAt = 0;
+  }
+
+  private playTellMotion(profile: EnemyTellProfile): void {
+    const squash = profile.tell === "hop-crouch" || profile.tell === "charge-windup";
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: squash ? 1 + 0.12 * profile.intensity : 0.94,
+      scaleY: squash ? 1 - 0.1 * profile.intensity : 1.08,
+      angle: profile.tell === "turret-lock" ? 4 * this.direction : 0,
+      yoyo: true,
+      duration: Math.max(70, Math.floor(profile.durationMs / 2)),
+      ease: "Sine.easeInOut",
+      onComplete: () => {
+        this.setScale(1);
+        this.setAngle(0);
+      },
+    });
+  }
+
+  private playHitMotion(direction: -1 | 1): void {
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: 0.9,
+      scaleY: 1.08,
+      angle: -6 * direction,
+      yoyo: true,
+      duration: 70,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        this.setScale(1);
+        this.setAngle(0);
+      },
     });
   }
 }
