@@ -5,6 +5,7 @@ coverage/
 .vite/
 test-results/
 playwright-report/
+.vercel/
 *.tsbuildinfo
 *.log
 *.local
