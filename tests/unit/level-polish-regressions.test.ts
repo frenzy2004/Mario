@@ -858,6 +858,15 @@ const polishChecks: PolishRegressionCheck[] = [
       expect(level.windZones.length).toBeGreaterThanOrEqual(4);
     },
   },
+  {
+    name: "keeps the final boss arena active",
+    run: (levels) => {
+      const level = getLevel(levels, "final-crown");
+      expect(level.boss).toBeDefined();
+      expect(level.boss?.health).toBeGreaterThanOrEqual(7);
+      expect(level.boss?.arenaRight).toBeGreaterThan(level.boss?.arenaLeft ?? 0);
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
