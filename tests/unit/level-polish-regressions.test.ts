@@ -891,9 +891,18 @@ const polishChecks: PolishRegressionCheck[] = [
     run: (levels) => {
       const ordered = [...levels].sort((a, b) => a.index - b.index);
       for (let index = 0; index < ordered.length - 1; index += 1) {
-        expect(ordered[index].goal.nextLevelId).toBe(ordered[index + 1].id);
+        const current = ordered[index]!;
+        const next = ordered[index + 1]!;
+        expect(current.goal.nextLevelId).toBe(next.id);
       }
       expect(ordered.at(-1)?.goal.nextLevelId).toBeUndefined();
+    },
+  },
+  {
+    name: "keeps the generated campaign at full length",
+    run: (levels) => {
+      expect(levels).toHaveLength(43);
+      expect(levels.filter((level) => level.boss).map((level) => level.id)).toEqual(["final-crown"]);
     },
   },
 ];
@@ -910,4 +919,8 @@ describe("generated level polish regressions", () => {
       check.run(ALL_LEVELS);
     });
   }
+
+  it("tracks ninety focused polish checks", () => {
+    expect(polishChecks).toHaveLength(90);
+  });
 });
