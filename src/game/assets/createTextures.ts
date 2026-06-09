@@ -75,28 +75,181 @@ function createPlayerTextures(scene: Phaser.Scene): void {
         continue;
       }
       const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-      const bob = Math.sin(frame * 0.9) * 1.5;
-      const squash = state === "land" ? 2 : state === "jump" ? -1 : 0;
-      graphics.fillStyle(0x111827, 0.22);
-      graphics.fillEllipse(16, 32, 24, 7);
-      graphics.fillStyle(0x35615c, 1);
-      graphics.fillRoundedRect(8, 8 + bob - squash, 16, 21 + squash, 5);
-      graphics.fillStyle(0xf5b45f, 1);
-      graphics.fillRoundedRect(9, 4 + bob, 14, 11, 5);
-      graphics.fillStyle(0xff5c7a, 1);
-      graphics.fillTriangle(8, 13 + bob, 0, 16 + bob + frame * 0.2, 8, 19 + bob);
-      graphics.fillStyle(0x21363f, 1);
-      graphics.fillRect(12, 9 + bob, 2, 2);
-      graphics.fillRect(19, 9 + bob, 2, 2);
-      graphics.fillStyle(0x1e293b, 1);
-      const footOffset = state === "run" ? (frame % 2 === 0 ? 2 : -2) : 0;
-      graphics.fillRoundedRect(6 + footOffset, 28 + bob, 10, 5, 2);
-      graphics.fillRoundedRect(17 - footOffset, 28 + bob, 10, 5, 2);
-      graphics.fillStyle(0xd6a33f, 1);
-      graphics.fillCircle(24, 18 + bob, 4);
+      drawHeroFrame(graphics, state as keyof typeof PLAYER_STATE_FRAMES, frame);
       graphics.generateTexture(key, 32, 36);
       graphics.destroy();
     }
+  }
+}
+
+function drawHeroFrame(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  frame: number,
+): void {
+  const runCycle = frame % 4;
+  const runStep = runCycle === 0 || runCycle === 3 ? 1 : -1;
+  const bob =
+    state === "run"
+      ? (runCycle === 1 || runCycle === 2 ? -1 : 0)
+      : state === "victory"
+        ? Math.sin(frame * 0.9) * 1.2
+        : Math.sin(frame * 0.75) * 0.7;
+  const airborneLift = state === "jump" ? -2 : state === "fall" ? 1 : 0;
+  const landSquash = state === "land" ? 2 : 0;
+  const hurtJolt = state === "hurt" ? (frame % 2 === 0 ? -1 : 1) : 0;
+  const y = bob + airborneLift;
+
+  graphics.fillStyle(0x07131e, 0.24);
+  graphics.fillEllipse(16, 32, state === "jump" ? 18 : 24, state === "jump" ? 5 : 7);
+
+  drawHeroScarf(graphics, state, frame, y);
+  drawHeroLegs(graphics, state, frame, y, runStep, landSquash);
+  drawHeroBody(graphics, state, y, landSquash, hurtJolt);
+  drawHeroArms(graphics, state, frame, y, runStep);
+  drawHeroHead(graphics, state, frame, y, hurtJolt);
+}
+
+function drawHeroBody(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  y: number,
+  landSquash: number,
+  hurtJolt: number,
+): void {
+  const coatTop = 13 + y - landSquash * 0.4;
+  const coatHeight = 16 + landSquash;
+  const coatColor = state === "hurt" ? 0x6b3346 : 0x11635f;
+  const trimColor = state === "victory" ? 0xfacc15 : 0x7dd3fc;
+
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRoundedRect(7 + hurtJolt, coatTop - 1, 18, coatHeight + 2, 5);
+  graphics.fillStyle(coatColor, 1);
+  graphics.fillRoundedRect(8 + hurtJolt, coatTop, 16, coatHeight, 5);
+  graphics.fillStyle(0x0f3b3b, 1);
+  graphics.fillRect(9 + hurtJolt, coatTop + 9, 14, 6);
+  graphics.fillStyle(0x49c6b7, 1);
+  graphics.fillRoundedRect(10 + hurtJolt, coatTop + 2, 5, 12, 2);
+  graphics.fillStyle(0x0b2d2e, 1);
+  graphics.fillRect(16 + hurtJolt, coatTop + 2, 2, 15);
+  graphics.fillStyle(trimColor, 1);
+  graphics.fillRect(18 + hurtJolt, coatTop + 5, 3, 2);
+  graphics.fillRect(18 + hurtJolt, coatTop + 10, 3, 2);
+
+  graphics.fillStyle(0xd9a64a, 1);
+  graphics.fillRoundedRect(9 + hurtJolt, coatTop + coatHeight - 4, 15, 3, 1);
+  graphics.fillStyle(0x6b3f21, 1);
+  graphics.fillRect(15 + hurtJolt, coatTop + coatHeight - 4, 3, 3);
+}
+
+function drawHeroHead(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  frame: number,
+  y: number,
+  hurtJolt: number,
+): void {
+  const headY = 4 + y + (state === "land" ? 1 : 0);
+  const blink = state === "idle" && frame === 2;
+
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRoundedRect(8 + hurtJolt, headY - 1, 16, 13, 6);
+  graphics.fillStyle(state === "hurt" ? 0xf38b70 : 0xf0b45e, 1);
+  graphics.fillRoundedRect(9 + hurtJolt, headY, 14, 12, 6);
+  graphics.fillStyle(0xffd27a, 1);
+  graphics.fillRect(12 + hurtJolt, headY + 1, 7, 2);
+  graphics.fillStyle(0x7a3f24, 1);
+  graphics.fillRoundedRect(7 + hurtJolt, headY + 2, 5, 8, 3);
+  graphics.fillRect(9 + hurtJolt, headY, 10, 2);
+
+  graphics.fillStyle(0xd6a33f, 1);
+  graphics.fillRoundedRect(10 + hurtJolt, headY + 4, 13, 5, 2);
+  graphics.fillStyle(0x172033, 1);
+  graphics.fillRoundedRect(11 + hurtJolt, headY + 5, 5, 3, 1);
+  graphics.fillRoundedRect(18 + hurtJolt, headY + 5, 4, 3, 1);
+  graphics.fillStyle(0xa7f3d0, 1);
+  graphics.fillRect(12 + hurtJolt, headY + 5, 2, 1);
+  graphics.fillRect(19 + hurtJolt, headY + 5, 1, 1);
+
+  graphics.fillStyle(0x111827, 1);
+  if (blink) {
+    graphics.fillRect(12 + hurtJolt, headY + 7, 3, 1);
+    graphics.fillRect(19 + hurtJolt, headY + 7, 2, 1);
+  } else {
+    graphics.fillRect(13 + hurtJolt, headY + 6, 1, 2);
+    graphics.fillRect(20 + hurtJolt, headY + 6, 1, 2);
+  }
+  graphics.fillStyle(state === "victory" ? 0xfde68a : 0x7a3f24, 1);
+  graphics.fillRect(15 + hurtJolt, headY + 10, state === "hurt" ? 3 : 4, 1);
+}
+
+function drawHeroScarf(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  frame: number,
+  y: number,
+): void {
+  const scarfY = 15 + y;
+  const flutter = state === "run" ? 2 + (frame % 2) : state === "jump" || state === "fall" ? 3 : 1;
+  graphics.fillStyle(0xb91c1c, 1);
+  graphics.fillTriangle(9, scarfY, 2, scarfY + 2 + flutter, 9, scarfY + 5);
+  graphics.fillStyle(0xff6b7a, 1);
+  graphics.fillTriangle(9, scarfY + 1, 4, scarfY + 2 + flutter, 9, scarfY + 3);
+  graphics.fillStyle(0x7f1d1d, 1);
+  graphics.fillRect(9, scarfY, 12, 3);
+}
+
+function drawHeroArms(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  frame: number,
+  y: number,
+  runStep: number,
+): void {
+  const swing = state === "run" ? runStep * 2 : state === "skid" ? -3 : state === "victory" ? -4 : 0;
+  const leftHandY = state === "victory" ? 9 + Math.sin(frame) * 1.3 : 19 + y - swing * 0.4;
+  const rightHandY = state === "jump" ? 17 + y : 19 + y + swing * 0.4;
+
+  graphics.lineStyle(4, 0x0f172a, 1);
+  graphics.lineBetween(9, 18 + y, 5, leftHandY);
+  graphics.lineBetween(23, 18 + y, 27, rightHandY);
+  graphics.lineStyle(2, 0x49c6b7, 1);
+  graphics.lineBetween(9, 18 + y, 5, leftHandY);
+  graphics.lineBetween(23, 18 + y, 27, rightHandY);
+  graphics.fillStyle(0xf0b45e, 1);
+  graphics.fillCircle(5, leftHandY, 3);
+  graphics.fillCircle(27, rightHandY, 3);
+}
+
+function drawHeroLegs(
+  graphics: Phaser.GameObjects.Graphics,
+  state: keyof typeof PLAYER_STATE_FRAMES,
+  frame: number,
+  y: number,
+  runStep: number,
+  landSquash: number,
+): void {
+  const stride = state === "run" ? runStep * 3 : state === "skid" ? -3 : 0;
+  const bootY = 28 + y + landSquash * 0.5;
+  const leftBootX = 6 + stride;
+  const rightBootX = 17 - stride;
+
+  graphics.fillStyle(0x12202a, 1);
+  graphics.fillRect(11, 25 + y, 5, 5);
+  graphics.fillRect(18, 25 + y, 5, 5);
+  if (state === "jump") {
+    graphics.fillRect(13, 27 + y, 5, 3);
+    graphics.fillRect(18, 26 + y, 5, 3);
+  }
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRoundedRect(leftBootX, bootY, 10, 5, 2);
+  graphics.fillRoundedRect(rightBootX, bootY, 10, 5, 2);
+  graphics.fillStyle(0x334155, 1);
+  graphics.fillRect(leftBootX + 1, bootY, 7, 2);
+  graphics.fillRect(rightBootX + 1, bootY, 7, 2);
+  if (state === "victory") {
+    graphics.fillStyle(0xfacc15, frame % 2 ? 0.95 : 0.5);
+    graphics.fillCircle(16, 2 + y, 2);
   }
 }
 
