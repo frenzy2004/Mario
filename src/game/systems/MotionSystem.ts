@@ -8,8 +8,27 @@ export type FeedbackEvent =
   | { kind: "jump" | "land" | "dash" | "hurt" | "respawn" | "victory"; target?: MotionTarget; x: number; y: number }
   | { kind: "pickup"; collectibleKind?: string; score?: number; target?: MotionTarget; x: number; y: number }
   | { kind: "powerup"; powerupKind?: string; target?: MotionTarget; x: number; y: number }
+  | {
+      kind: "enemyTell";
+      enemyKind?: string;
+      tell?: string;
+      durationMs?: number;
+      intensity?: number;
+      target?: MotionTarget;
+      x: number;
+      y: number;
+    }
   | { kind: "enemyHit" | "enemyDefeat"; enemyKind?: string; target?: MotionTarget; x: number; y: number }
   | { kind: "bossAttack"; attack?: string; phase?: number; target?: MotionTarget; x: number; y: number }
+  | {
+      kind: "bossTelegraph" | "bossStagger" | "bossDefeat";
+      attack?: string;
+      phase?: number;
+      intensity?: number;
+      target?: MotionTarget;
+      x: number;
+      y: number;
+    }
   | { kind: "bossPhase"; phase: number; previousPhase?: number; target?: MotionTarget; x: number; y: number }
   | { kind: "checkpoint" | "goal"; target?: MotionTarget; x: number; y: number }
   | { kind: "sceneTransition"; direction: SceneFadeDirection };
@@ -675,18 +694,83 @@ export class MotionSystem {
       case "powerup":
         this.powerAura(event.target, event.powerupKind);
         return this.burst(event.x, event.y, "particle-spark", { count: 14, tint: 0x67e8f9 });
+      case "enemyTell": {
+        const style = enemyFeedbackStyle(event.enemyKind);
+        this.pulseTarget(event.target, 1 + 0.08 * (event.intensity ?? 1), Math.min(180, event.durationMs ?? 120));
+        const particles = this.burst(event.x, event.y, style.tellTexture, {
+          count: event.tell === "turret-lock" ? 6 : 4,
+          distance: event.tell === "charge-windup" ? 28 : 18,
+          tint: style.tellTint,
+          startScale: 0.82,
+          endScale: 0.2,
+        });
+        const ring =
+          event.tell === "turret-lock" || event.tell === "charge-windup"
+            ? this.warningRing(event.x, event.y, style.tellTint, event.tell === "turret-lock" ? 54 : 42)
+            : undefined;
+        return ring ? [ring, ...particles] : particles;
+      }
       case "enemyHit":
         this.pulseTarget(event.target, 1.12, 95);
-        return this.burst(event.x, event.y, "particle-spark", { count: 8, tint: 0xfef08a });
-      case "enemyDefeat":
+        return this.burst(event.x, event.y, enemyFeedbackStyle(event.enemyKind).hitTexture, {
+          count: 8,
+          tint: enemyFeedbackStyle(event.enemyKind).hitTint,
+          distance: 34,
+        });
+      case "enemyDefeat": {
+        const style = enemyFeedbackStyle(event.enemyKind);
         this.hitStop(55);
-        return this.burst(event.x, event.y, "particle-leaf", { count: 13, distance: 46 });
-      case "bossAttack":
-        return this.warningRing(event.x, event.y, 0xf97316, event.attack === "rootStomp" ? 86 : 58);
+        this.pulseTarget(event.target, 1.18, 110);
+        return this.burst(event.x, event.y, style.defeatTexture, {
+          count: style.defeatCount,
+          distance: style.defeatDistance,
+          tint: style.defeatTint,
+        });
+      }
+      case "bossTelegraph": {
+        const style = bossAttackFeedbackStyle(event.attack);
+        this.pulseTarget(event.target, 1.07 + 0.03 * (event.intensity ?? 1), 150);
+        const particles = this.burst(event.x, event.y - 24, "particle-spark", {
+          count: 5,
+          distance: 24,
+          tint: style.color,
+          alpha: 0.72,
+        });
+        const ring = this.warningRing(event.x, event.y, style.color, style.telegraphRadius);
+        return ring ? [ring, ...particles] : particles;
+      }
+      case "bossAttack": {
+        const style = bossAttackFeedbackStyle(event.attack);
+        const ring = this.warningRing(event.x, event.y, style.color, style.attackRadius);
+        const particles = this.burst(event.x, event.y - 28, "particle-spark", {
+          count: 7,
+          distance: 34,
+          tint: style.color,
+        });
+        return ring ? [ring, ...particles] : particles;
+      }
       case "bossPhase":
         this.hitStop(90);
         this.cameraImpulse(0.004, 150);
-        return this.warningRing(event.x, event.y, 0xfacc15, 124);
+        return [
+          this.warningRing(event.x, event.y, 0xfacc15, 124),
+          ...this.burst(event.x, event.y - 32, "particle-leaf", { count: 16, distance: 72, tint: 0xfacc15 }),
+        ].filter(Boolean) as MotionTarget[];
+      case "bossStagger":
+        this.pulseTarget(event.target, 1.12, 170);
+        return [
+          this.warningRing(event.x, event.y, 0x93c5fd, 76),
+          ...this.burst(event.x, event.y - 24, "particle-spark", { count: 12, distance: 52, tint: 0x93c5fd }),
+        ].filter(Boolean) as MotionTarget[];
+      case "bossDefeat":
+        this.hitStop(120);
+        this.cameraImpulse(0.0045, 180);
+        this.pulseTarget(event.target, 1.22, 220);
+        return [
+          this.warningRing(event.x, event.y, 0xfde68a, 150),
+          ...this.burst(event.x, event.y - 36, "particle-leaf", { count: 22, distance: 96, tint: 0xfde68a }),
+          ...this.burst(event.x, event.y - 30, "particle-spark", { count: 14, distance: 70, tint: 0xf97316 }),
+        ].filter(Boolean) as MotionTarget[];
       case "checkpoint":
         this.scorePopup(event.x, event.y - 20, "Checkpoint");
         return this.warningRing(event.x, event.y, 0x38bdf8, 58);
@@ -981,6 +1065,87 @@ function scaledCount(count: number, profile: MotionProfile): number {
     return Math.min(base, Math.max(1, Math.ceil(base * profile.particleScale)));
   }
   return base;
+}
+
+interface EnemyFeedbackStyle {
+  tellTint: number;
+  hitTint: number;
+  defeatTint: number;
+  tellTexture: string;
+  hitTexture: string;
+  defeatTexture: string;
+  defeatCount: number;
+  defeatDistance: number;
+}
+
+const DEFAULT_ENEMY_FEEDBACK_STYLE: EnemyFeedbackStyle = {
+  tellTint: 0xfde68a,
+  hitTint: 0xfef08a,
+  defeatTint: 0x8dde73,
+  tellTexture: "particle-dust",
+  hitTexture: "particle-spark",
+  defeatTexture: "particle-leaf",
+  defeatCount: 13,
+  defeatDistance: 46,
+};
+
+const ENEMY_FEEDBACK_STYLES: Record<string, EnemyFeedbackStyle> = {
+  beetle: { ...DEFAULT_ENEMY_FEEDBACK_STYLE, tellTint: 0xa7f3d0, defeatTint: 0x84cc16 },
+  acorn: { ...DEFAULT_ENEMY_FEEDBACK_STYLE, tellTint: 0xfacc15, hitTint: 0xfcd34d, defeatTint: 0xb45309 },
+  lantern: {
+    ...DEFAULT_ENEMY_FEEDBACK_STYLE,
+    tellTint: 0x67e8f9,
+    hitTint: 0x7dd3fc,
+    defeatTint: 0x22d3ee,
+    tellTexture: "particle-spark",
+    defeatTexture: "particle-spark",
+  },
+  charger: {
+    ...DEFAULT_ENEMY_FEEDBACK_STYLE,
+    tellTint: 0xfb923c,
+    hitTint: 0xfdba74,
+    defeatTint: 0xf97316,
+    defeatCount: 16,
+    defeatDistance: 58,
+  },
+  spiker: {
+    ...DEFAULT_ENEMY_FEEDBACK_STYLE,
+    tellTint: 0xfda4af,
+    hitTint: 0xfb7185,
+    defeatTint: 0xe11d48,
+    hitTexture: "particle-spark",
+    defeatTexture: "particle-spark",
+  },
+  turret: {
+    ...DEFAULT_ENEMY_FEEDBACK_STYLE,
+    tellTint: 0x93c5fd,
+    hitTint: 0xbfdbfe,
+    defeatTint: 0x60a5fa,
+    tellTexture: "particle-spark",
+    hitTexture: "particle-spark",
+    defeatTexture: "particle-spark",
+    defeatCount: 18,
+    defeatDistance: 62,
+  },
+};
+
+function enemyFeedbackStyle(kind: string | undefined): EnemyFeedbackStyle {
+  return ENEMY_FEEDBACK_STYLES[kind ?? ""] ?? DEFAULT_ENEMY_FEEDBACK_STYLE;
+}
+
+function bossAttackFeedbackStyle(attack: string | undefined): { color: number; telegraphRadius: number; attackRadius: number } {
+  switch (attack) {
+    case "gearVolley":
+      return { color: 0xfacc15, telegraphRadius: 58, attackRadius: 68 };
+    case "rootStomp":
+      return { color: 0x22c55e, telegraphRadius: 82, attackRadius: 96 };
+    case "steamSweep":
+      return { color: 0x67e8f9, telegraphRadius: 74, attackRadius: 88 };
+    case "dashWeave":
+      return { color: 0xfb923c, telegraphRadius: 66, attackRadius: 82 };
+    default:
+      return { color: 0xf97316, telegraphRadius: 58, attackRadius: 68 };
+  }
 }
 
 function splitColor(color: number): { red: number; green: number; blue: number } {

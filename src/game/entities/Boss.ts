@@ -2,7 +2,7 @@ import Phaser from "phaser";
 
 export type BossPhase = 1 | 2 | 3;
 export type BossAttack = "gearVolley" | "rootStomp" | "steamSweep" | "dashWeave";
-export type BossState = "idle" | BossAttack | "staggered" | "defeated";
+export type BossState = "idle" | "telegraphing" | BossAttack | "staggered" | "defeated";
 export type BossTelegraphKind = "gear-aim" | "root-compress" | "steam-draw" | "dash-coil" | "phase-surge";
 export type BossMotionCueName = "spawn" | "telegraph" | "attack" | "phase" | "hit" | "stagger" | "defeat";
 
@@ -142,13 +142,15 @@ export const BOSS_ATTACK_TELEGRAPHS: Record<BossAttack, BossAttackTelegraph> = {
 
 export function getBossPhase(health: number, maxHealth: number): BossPhase {
   const ratio = maxHealth <= 0 ? 0 : Phaser.Math.Clamp(health / maxHealth, 0, 1);
-  if (ratio <= 0.34) {
-    return 3;
+  const phases = Object.keys(BOSS_PHASES)
+    .map((phase) => Number(phase) as BossPhase)
+    .sort((a, b) => BOSS_PHASES[b].minHealthRatio - BOSS_PHASES[a].minHealthRatio);
+  for (const phase of phases) {
+    if (ratio > BOSS_PHASES[phase].minHealthRatio) {
+      return phase;
+    }
   }
-  if (ratio <= 0.67) {
-    return 2;
-  }
-  return 1;
+  return 3;
 }
 
 export function chooseBossAttack(phase: BossPhase, previous?: BossAttack, random = Math.random): BossAttack {
@@ -191,6 +193,8 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   private direction = 1;
   private nextAttackAt = 0;
   private attackEndsAt = 0;
+  private telegraphEndsAt = 0;
+  private pendingAttack?: BossAttack;
   private lastAttack?: BossAttack;
 
   constructor(
@@ -277,7 +281,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
       this.direction = -1;
     }
 
-    if (this.state !== "idle" && time >= this.attackEndsAt) {
+    if (this.state === "telegraphing" && time >= this.telegraphEndsAt) {
+      this.beginTelegraphedAttack(time);
+    }
+
+    if (this.state !== "idle" && this.state !== "telegraphing" && time >= this.attackEndsAt) {
       this.finishAttack(time);
     }
 
@@ -331,9 +339,11 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   startAttack(attack: BossAttack, time = this.scene.time.now): BossAttackEvent {
     const phaseDefinition = BOSS_PHASES[this.phase];
     const telegraph = getBossAttackTelegraph(attack, this.phase);
-    this.state = attack;
+    this.state = "telegraphing";
+    this.pendingAttack = attack;
     this.lastAttack = attack;
-    this.attackEndsAt = time + phaseDefinition.attackDurationMs;
+    this.telegraphEndsAt = time + telegraph.durationMs;
+    this.attackEndsAt = this.telegraphEndsAt + phaseDefinition.attackDurationMs;
 
     const telegraphCue = this.emitMotionCue("telegraph", time, {
       attack,
@@ -344,6 +354,34 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     });
     this.scene.events.emit("boss:telegraph", telegraphCue, this);
     this.playTelegraphMotion(telegraph);
+
+    const event: BossAttackEvent = {
+      attack,
+      phase: this.phase,
+      x: this.x,
+      y: this.y,
+      damage: phaseDefinition.contactDamage,
+      startedAt: this.telegraphEndsAt,
+      durationMs: phaseDefinition.attackDurationMs,
+      telegraph,
+    };
+
+    return event;
+  }
+
+  private beginTelegraphedAttack(time: number): BossAttackEvent | undefined {
+    const attack = this.pendingAttack;
+    if (!attack || this.defeated) {
+      this.pendingAttack = undefined;
+      this.state = "idle";
+      return undefined;
+    }
+
+    const phaseDefinition = BOSS_PHASES[this.phase];
+    const telegraph = getBossAttackTelegraph(attack, this.phase);
+    this.state = attack;
+    this.pendingAttack = undefined;
+    this.attackEndsAt = time + phaseDefinition.attackDurationMs;
 
     const event: BossAttackEvent = {
       attack,
@@ -388,8 +426,17 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.phase = nextPhase;
     this.contactDamage = BOSS_PHASES[this.phase].contactDamage;
     this.setData("bossPhase", this.phase);
-    this.scene.events.emit("boss:phase", this.phase, previousPhase, this);
     const telegraph = getBossPhaseTelegraph(this.phase, previousPhase);
+    const now = this.scene.time.now;
+    this.pendingAttack = undefined;
+    this.telegraphEndsAt = 0;
+    if (this.state !== "defeated") {
+      this.state = "idle";
+      this.attackEndsAt = now;
+      this.setVelocityX(0);
+    }
+
+    this.scene.events.emit("boss:phase", this.phase, previousPhase, this);
     const cue = this.emitMotionCue("phase", this.scene.time.now, {
       previousPhase,
       telegraph: telegraph.telegraph,
@@ -397,11 +444,16 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
       intensity: telegraph.intensity,
     });
     this.scene.events.emit("boss:phase-telegraph", cue, this);
-    this.nextAttackAt = Math.max(this.nextAttackAt, this.scene.time.now + telegraph.durationMs);
+    this.nextAttackAt = Math.max(this.nextAttackAt, now + telegraph.durationMs + 220);
     this.playPhaseMotion(telegraph);
   }
 
   private applyMovement(time: number): void {
+    if (this.state === "telegraphing") {
+      this.setVelocityX(BOSS_PHASES[this.phase].speed * 0.16 * this.direction);
+      return;
+    }
+
     if (this.state === "staggered") {
       this.setVelocityX(0);
       if (time >= this.attackEndsAt) {
@@ -439,8 +491,10 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     this.defeated = true;
     this.health = 0;
     this.state = "defeated";
+    this.pendingAttack = undefined;
     this.scene.tweens.killTweensOf(this);
-    const cue = this.emitMotionCue("defeat", this.scene.time.now, { durationMs: 520, intensity: 1.6, source });
+    const durationMs = 680;
+    const cue = this.emitMotionCue("defeat", this.scene.time.now, { durationMs, intensity: 1.6, source });
     this.scene.events.emit("boss:defeated", this, cue);
     this.disableBody(true, false);
     this.scene.tweens.add({
@@ -448,9 +502,12 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
       alpha: 0,
       scale: 1.35,
       angle: 25,
-      duration: 520,
+      duration: durationMs,
       ease: "Back.easeIn",
-      onComplete: () => this.destroy(),
+      onComplete: () => {
+        this.scene.events.emit("boss:defeat-complete", this, cue);
+        this.destroy();
+      },
     });
   }
 

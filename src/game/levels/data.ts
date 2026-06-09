@@ -1,7 +1,8 @@
-import { ALL_LEVELS } from "./generated";
+import { applyFriendReadiness } from "./friendReadiness";
+import { ALL_LEVELS as GENERATED_LEVELS } from "./generated";
 import type { LevelDefinition } from "./schema";
 
-export const LEVEL_DEFINITIONS: LevelDefinition[] = ALL_LEVELS;
+export const LEVEL_DEFINITIONS: LevelDefinition[] = applyFriendReadiness(GENERATED_LEVELS);
 
 export const LEVEL_IDS: string[] = LEVEL_DEFINITIONS.map((level) => level.id);
 

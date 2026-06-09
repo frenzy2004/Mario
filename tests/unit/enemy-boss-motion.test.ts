@@ -13,8 +13,8 @@ vi.mock("phaser", () => ({
   },
 }));
 
-import { getBossAttackTelegraph, getBossPhaseTelegraph, BOSS_PHASES } from "../../src/game/entities/Boss";
-import { getEnemyTellProfile } from "../../src/game/entities/Enemy";
+import { BOSS_PHASES, getBossAttackTelegraph, getBossPhase, getBossPhaseTelegraph } from "../../src/game/entities/Boss";
+import { getEnemyFeelProfile, getEnemyTellProfile } from "../../src/game/entities/Enemy";
 
 describe("enemy motion tells", () => {
   it("gives high-intent enemies readable tells", () => {
@@ -36,6 +36,14 @@ describe("enemy motion tells", () => {
   it("keeps ambient patrol enemies tell-free", () => {
     expect(getEnemyTellProfile("beetle")).toBeNull();
     expect(getEnemyTellProfile("lantern")).toBeNull();
+  });
+
+  it("returns defensive copies for enemy feel profiles", () => {
+    const profile = getEnemyFeelProfile("charger");
+    profile.hitTint = 0;
+
+    expect(getEnemyFeelProfile("charger").hitTint).toBe(0xfdba74);
+    expect(getEnemyFeelProfile("turret").defeatDurationMs).toBeGreaterThan(profile.defeatDurationMs);
   });
 });
 
@@ -67,5 +75,11 @@ describe("boss motion telegraphs", () => {
     expect(phaseTwo.telegraph).toBe("phase-surge");
     expect(phaseThree.durationMs).toBeGreaterThan(phaseTwo.durationMs);
     expect(phaseThree.intensity).toBeGreaterThan(phaseTwo.intensity);
+  });
+
+  it("derives boss phase thresholds from phase configuration", () => {
+    expect(getBossPhase(BOSS_PHASES[1].minHealthRatio * 100 + 1, 100)).toBe(1);
+    expect(getBossPhase(BOSS_PHASES[1].minHealthRatio * 100, 100)).toBe(2);
+    expect(getBossPhase(BOSS_PHASES[2].minHealthRatio * 100, 100)).toBe(3);
   });
 });

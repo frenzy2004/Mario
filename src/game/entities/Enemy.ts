@@ -45,6 +45,16 @@ export interface EnemyTellProfile {
   intensity: number;
 }
 
+export interface EnemyFeelProfile {
+  kind: EnemyKind;
+  tellTint: number;
+  hitTint: number;
+  defeatTint: number;
+  defeatScaleX: number;
+  defeatScaleY: number;
+  defeatDurationMs: number;
+}
+
 export interface EnemyMotionCueEvent {
   scope: "enemy";
   cue: EnemyMotionCueName;
@@ -144,6 +154,63 @@ export const ENEMY_TELL_PROFILES: Partial<Record<EnemyKind, EnemyTellProfile>> =
   turret: { tell: "turret-lock", durationMs: 340, intensity: 1.1 },
 };
 
+export const ENEMY_FEEL_PROFILES: Record<EnemyKind, EnemyFeelProfile> = {
+  beetle: {
+    kind: "beetle",
+    tellTint: 0xa7f3d0,
+    hitTint: 0xfef08a,
+    defeatTint: 0x84cc16,
+    defeatScaleX: 1.38,
+    defeatScaleY: 0.2,
+    defeatDurationMs: 175,
+  },
+  acorn: {
+    kind: "acorn",
+    tellTint: 0xfacc15,
+    hitTint: 0xfcd34d,
+    defeatTint: 0xb45309,
+    defeatScaleX: 1.52,
+    defeatScaleY: 0.16,
+    defeatDurationMs: 185,
+  },
+  lantern: {
+    kind: "lantern",
+    tellTint: 0x67e8f9,
+    hitTint: 0x7dd3fc,
+    defeatTint: 0x22d3ee,
+    defeatScaleX: 1.24,
+    defeatScaleY: 0.28,
+    defeatDurationMs: 210,
+  },
+  charger: {
+    kind: "charger",
+    tellTint: 0xfb923c,
+    hitTint: 0xfdba74,
+    defeatTint: 0xf97316,
+    defeatScaleX: 1.64,
+    defeatScaleY: 0.14,
+    defeatDurationMs: 210,
+  },
+  spiker: {
+    kind: "spiker",
+    tellTint: 0xfda4af,
+    hitTint: 0xfb7185,
+    defeatTint: 0xe11d48,
+    defeatScaleX: 1.3,
+    defeatScaleY: 0.22,
+    defeatDurationMs: 195,
+  },
+  turret: {
+    kind: "turret",
+    tellTint: 0x93c5fd,
+    hitTint: 0xbfdbfe,
+    defeatTint: 0x60a5fa,
+    defeatScaleX: 1.5,
+    defeatScaleY: 0.2,
+    defeatDurationMs: 230,
+  },
+};
+
 type TrackableTarget = Phaser.GameObjects.GameObject & { x: number; y: number; active?: boolean };
 
 interface NormalizedEnemyDefinition extends EnemyDefinition {
@@ -179,6 +246,10 @@ export function animationFor(kind: EnemyKind): string {
 export function getEnemyTellProfile(kind: EnemyKind): EnemyTellProfile | null {
   const profile = ENEMY_TELL_PROFILES[kind];
   return profile ? { ...profile } : null;
+}
+
+export function getEnemyFeelProfile(kind: EnemyKind): EnemyFeelProfile {
+  return { ...ENEMY_FEEL_PROFILES[kind] };
 }
 
 function normalizeDefinition(
@@ -352,7 +423,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     this.health = Math.max(0, this.health - amount);
     this.invulnerableUntil = now + 180;
-    this.setTint(0xfef08a);
+    const feel = getEnemyFeelProfile(this.kind);
+    this.setTint(feel.hitTint);
 
     let hitDirection: -1 | 1 = this.direction < 0 ? -1 : 1;
     if (typeof hit.sourceX === "number") {
@@ -381,15 +453,21 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.defeated = true;
     this.health = 0;
     this.scene.tweens.killTweensOf(this);
-    const cue = this.emitMotionCue("defeat", this.scene.time.now, { durationMs: 180, intensity: 1.35, source });
+    const feel = getEnemyFeelProfile(this.kind);
+    this.setTint(feel.defeatTint);
+    const cue = this.emitMotionCue("defeat", this.scene.time.now, {
+      durationMs: feel.defeatDurationMs,
+      intensity: 1.35,
+      source,
+    });
     this.scene.events.emit("enemy:defeated", this, source, cue);
     this.disableBody(true, false);
     this.scene.tweens.add({
       targets: this,
-      scaleX: 1.45,
-      scaleY: 0.18,
+      scaleX: feel.defeatScaleX,
+      scaleY: feel.defeatScaleY,
       alpha: 0,
-      duration: 180,
+      duration: feel.defeatDurationMs,
       ease: "Quad.easeOut",
       onComplete: () => this.destroy(),
     });
@@ -490,6 +568,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
+    if (this.target && this.target.active !== false) {
+      this.direction = this.target.x < this.x ? -1 : 1;
+    }
     const profile = getEnemyTellProfile(this.kind);
     if (profile) {
       this.beginTell(profile, time);
@@ -501,6 +582,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private fireTurret(time: number): void {
     this.nextActionAt = time + 1500 + this.definition.phase * 15;
     const direction = this.target && this.target.x < this.x ? -1 : 1;
+    this.direction = direction;
     this.emitMotionCue("attack", time, { durationMs: 120, intensity: 1, tell: "turret-lock" });
     this.scene.events.emit("enemy:turret-fire", {
       enemy: this,
@@ -530,6 +612,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   private playTellMotion(profile: EnemyTellProfile): void {
     const squash = profile.tell === "hop-crouch" || profile.tell === "charge-windup";
+    const feel = getEnemyFeelProfile(this.kind);
+    this.setTint(feel.tellTint);
     this.scene.tweens.add({
       targets: this,
       scaleX: squash ? 1 + 0.12 * profile.intensity : 0.94,
@@ -541,6 +625,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       onComplete: () => {
         this.setScale(1);
         this.setAngle(0);
+        if (!this.defeated && this.scene.time.now >= this.invulnerableUntil) {
+          this.clearTint();
+        }
       },
     });
   }

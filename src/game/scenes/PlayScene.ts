@@ -9,7 +9,8 @@ import {
   type PlayerSquashStretchCueConfig,
 } from "../config/player";
 import { WORLD_CONFIG } from "../config/world";
-import type { Boss } from "../entities/Boss";
+import type { Boss, BossMotionCueEvent } from "../entities/Boss";
+import type { EnemyMotionCueEvent } from "../entities/Enemy";
 import { Player } from "../entities/Player";
 import type { Collectible } from "../entities/Collectible";
 import type { MovingPlatform } from "../entities/MovingPlatform";
@@ -189,8 +190,6 @@ export class PlayScene extends Phaser.Scene {
         const result = this.combat.handleBossOverlap(bossObject as Boss);
         if (result === "defeated") {
           this.scoreState = addEnemyScore(this.scoreState, true);
-          this.spawned.goal.locked = false;
-          this.spawned.goal.clearTint();
         } else if (result === "hurt") {
           this.damageOrRespawn(false);
         }
@@ -279,6 +278,7 @@ export class PlayScene extends Phaser.Scene {
         y: number;
         getData?: (key: string) => unknown;
       };
+      this.events.emit("audio:enemyHit");
       this.motionSystem.handleFeedback({
         kind: "enemyHit",
         enemyKind: String(sprite.getData?.("enemyKind") ?? ""),
@@ -293,6 +293,7 @@ export class PlayScene extends Phaser.Scene {
         y: number;
         getData?: (key: string) => unknown;
       };
+      this.events.emit("audio:enemyDefeat");
       this.motionSystem.handleFeedback({
         kind: "enemyDefeat",
         enemyKind: String(sprite.getData?.("enemyKind") ?? ""),
@@ -301,8 +302,30 @@ export class PlayScene extends Phaser.Scene {
         y: sprite.y,
       });
     });
-    this.events.on("enemy:tell", (_cue: unknown, enemy: Phaser.GameObjects.GameObject) => {
-      this.motionSystem.pulse(enemy, { scale: 1.1, duration: 100 });
+    this.events.on("enemy:tell", (cue: EnemyMotionCueEvent, enemy: Phaser.GameObjects.GameObject) => {
+      this.events.emit("audio:enemyTell");
+      this.motionSystem.handleFeedback({
+        kind: "enemyTell",
+        enemyKind: cue.kind,
+        tell: cue.tell,
+        durationMs: cue.durationMs,
+        intensity: cue.intensity,
+        target: enemy,
+        x: cue.x,
+        y: cue.y,
+      });
+    });
+    this.events.on("boss:telegraph", (cue: BossMotionCueEvent, boss: Boss) => {
+      this.events.emit("audio:bossTelegraph");
+      this.motionSystem.handleFeedback({
+        kind: "bossTelegraph",
+        attack: cue.attack,
+        phase: cue.phase,
+        intensity: cue.intensity,
+        target: boss,
+        x: cue.x,
+        y: cue.y,
+      });
     });
     this.events.on("boss:attack", (event: { attack: string; phase: number; x: number; y: number }) => {
       this.motionSystem.handleFeedback({
@@ -311,6 +334,26 @@ export class PlayScene extends Phaser.Scene {
         phase: event.phase,
         x: event.x,
         y: event.y,
+      });
+    });
+    this.events.on("boss:damaged", (boss: Boss) => {
+      this.events.emit("audio:bossHit");
+      this.motionSystem.handleFeedback({
+        kind: "enemyHit",
+        enemyKind: "boss",
+        target: boss,
+        x: boss.x,
+        y: boss.y,
+      });
+    });
+    this.events.on("boss:stagger", (cue: BossMotionCueEvent, boss: Boss) => {
+      this.motionSystem.handleFeedback({
+        kind: "bossStagger",
+        phase: cue.phase,
+        intensity: cue.intensity,
+        target: boss,
+        x: cue.x,
+        y: cue.y,
       });
     });
     this.events.on("boss:phase", (phase: number, previousPhase: number, boss: Boss) => {
@@ -323,13 +366,26 @@ export class PlayScene extends Phaser.Scene {
         y: boss.y,
       });
     });
+    this.events.on("boss:phase-telegraph", () => {
+      this.events.emit("audio:bossPhase");
+    });
     this.events.on("boss:defeated", (boss: Boss) => {
+      this.events.emit("audio:bossDefeat");
       this.motionSystem.handleFeedback({
-        kind: "enemyDefeat",
-        enemyKind: "boss",
+        kind: "bossDefeat",
         target: boss,
         x: boss.x,
         y: boss.y,
+      });
+    });
+    this.events.on("boss:defeat-complete", () => {
+      this.spawned.goal.locked = false;
+      this.spawned.goal.clearTint();
+      this.motionSystem.handleFeedback({
+        kind: "goal",
+        target: this.spawned.goal,
+        x: this.spawned.goal.x,
+        y: this.spawned.goal.y,
       });
     });
     const cue = (label: string) => {
@@ -340,14 +396,25 @@ export class PlayScene extends Phaser.Scene {
         }
       });
     };
-    this.events.on("audio:jump", () => cue("jump"));
-    this.events.on("audio:land", () => cue("land"));
-    this.events.on("audio:dash", () => cue("dash"));
-    this.events.on("audio:collect", () => cue("collect"));
-    this.events.on("audio:hurt", () => cue("hurt"));
-    this.events.on("audio:checkpoint", () => cue("checkpoint"));
-    this.events.on("audio:powerup", () => cue("powerup"));
-    this.events.on("audio:goal", () => cue("goal"));
+    for (const label of [
+      "jump",
+      "land",
+      "dash",
+      "collect",
+      "hurt",
+      "checkpoint",
+      "powerup",
+      "enemyTell",
+      "enemyHit",
+      "enemyDefeat",
+      "goal",
+      "bossTelegraph",
+      "bossHit",
+      "bossPhase",
+      "bossDefeat",
+    ] as const) {
+      this.events.on(`audio:${label}`, () => cue(label));
+    }
   }
 
   private createFirstPlayOnboarding(touchControlsVisible: boolean): void {

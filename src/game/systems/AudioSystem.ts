@@ -29,6 +29,26 @@ const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
   muted: false,
 };
 
+const PLAY_SCENE_AUDIO_CUES: readonly SfxKey[] = [
+  "jump",
+  "land",
+  "collect",
+  "hurt",
+  "dash",
+  "checkpoint",
+  "powerup",
+  "enemy",
+  "enemyTell",
+  "enemyHit",
+  "enemyDefeat",
+  "goal",
+  "boss",
+  "bossTelegraph",
+  "bossHit",
+  "bossPhase",
+  "bossDefeat",
+];
+
 export class AudioSystem {
   private readonly audioContextFactory: () => AudioContext | null;
   private context?: AudioContext;
@@ -44,7 +64,7 @@ export class AudioSystem {
   constructor(private readonly scene?: Phaser.Scene, options: AudioSystemOptions = {}) {
     this.audioContextFactory = options.audioContextFactory ?? createAudioContext;
     if (scene) {
-      for (const cue of ["jump", "land", "collect", "hurt", "dash", "checkpoint", "powerup", "enemy", "goal", "boss"] as const) {
+      for (const cue of PLAY_SCENE_AUDIO_CUES) {
         scene.events.on(`audio:${cue}`, () => this.play(cue));
       }
       scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroy());

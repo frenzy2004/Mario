@@ -1,8 +1,9 @@
-import { ALL_LEVELS } from "./generated";
+import { LEVEL_DEFINITIONS } from "./data";
 import type { LevelDefinition } from "./schema";
 
-export { ALL_LEVELS };
+export const ALL_LEVELS: LevelDefinition[] = LEVEL_DEFINITIONS;
 export type { LevelDefinition };
+export { FRIEND_READY_LEVEL_COUNT, applyFriendReadiness, polishFriendReadyLevel } from "./friendReadiness";
 export {
   getLevelContentSummary,
   validateCampaignLevel,

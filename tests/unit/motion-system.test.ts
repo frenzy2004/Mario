@@ -187,6 +187,62 @@ describe("MotionSystem", () => {
     expect(scene.createdImages.length).toBeGreaterThan(0);
     expect(scene.tweenConfigs.length).toBeGreaterThan(0);
   });
+
+  it("creates enemy tell rings from typed cue payloads", () => {
+    const scene = createScene();
+    const motion = new MotionSystem(scene, { random: () => 0.5 });
+    const target = createTarget();
+
+    const result = motion.handleFeedback({
+      kind: "enemyTell",
+      enemyKind: "turret",
+      tell: "turret-lock",
+      durationMs: 340,
+      intensity: 1.1,
+      target,
+      x: 80,
+      y: 120,
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(scene.createdCircles).toHaveLength(1);
+    expect(scene.createdImages).toHaveLength(6);
+    expect(scene.tweenConfigs.length).toBeGreaterThan(0);
+  });
+
+  it("keeps minimal enemy tells static", () => {
+    const scene = createScene();
+    const motion = new MotionSystem(scene, { settings: { motionLevel: "minimal" } });
+
+    const result = motion.handleFeedback({
+      kind: "enemyTell",
+      enemyKind: "charger",
+      tell: "charge-windup",
+      durationMs: 260,
+      intensity: 1.2,
+      x: 80,
+      y: 120,
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(scene.createdCircles).toHaveLength(1);
+    expect(scene.createdImages).toHaveLength(0);
+    expect(scene.tweenConfigs).toHaveLength(0);
+  });
+
+  it("gives boss defeat a dedicated burst, ring, hit stop, and camera impulse", () => {
+    const scene = createScene();
+    const motion = new MotionSystem(scene, { random: () => 0.5 });
+    const target = createTarget();
+
+    const result = motion.handleFeedback({ kind: "bossDefeat", target, x: 120, y: 220 });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(scene.createdCircles).toHaveLength(1);
+    expect(scene.createdImages.length).toBeGreaterThanOrEqual(30);
+    expect(scene.camera.shake).toHaveBeenCalled();
+    expect(scene.tweens?.timeScale).toBe(0.08);
+  });
 });
 
 function createScene(): FakeScene {

@@ -7,8 +7,15 @@ export type CueName =
   | "checkpoint"
   | "powerup"
   | "enemy"
+  | "enemyTell"
+  | "enemyHit"
+  | "enemyDefeat"
   | "goal"
-  | "boss";
+  | "boss"
+  | "bossTelegraph"
+  | "bossHit"
+  | "bossPhase"
+  | "bossDefeat";
 
 export type SfxKey =
   | CueName
@@ -74,9 +81,47 @@ export const SFX_DEFINITIONS: Record<SfxKey, SfxDefinition> = {
   },
   checkpoint: { description: "Major checkpoint confirmation.", steps: sequence([440, 660, 880], "triangle", 0.14) },
   powerup: { description: "Four-note powerup lift.", steps: sequence([540, 810, 1080, 1440], "square", 0.12) },
-  enemy: { description: "Descending enemy defeat pluck.", steps: sequence([300, 220, 160], "triangle", 0.16) },
+  enemy: { description: "Legacy alias for enemy defeat pluck.", steps: sequence([300, 220, 160], "triangle", 0.16) },
+  enemyTell: {
+    description: "Short enemy warning tick before a readable attack.",
+    steps: [
+      { frequency: 780, endFrequency: 520, delay: 0, duration: 0.04, volume: 0.08, waveform: "square" },
+      { frequency: 980, endFrequency: 720, delay: 0.048, duration: 0.035, volume: 0.06, waveform: "triangle" },
+    ],
+  },
+  enemyHit: {
+    description: "Bright enemy flinch chirp.",
+    steps: [
+      { frequency: 620, endFrequency: 820, delay: 0, duration: 0.042, volume: 0.12, waveform: "triangle" },
+      { frequency: 420, endFrequency: 300, delay: 0.026, duration: 0.052, volume: 0.08, waveform: "square" },
+    ],
+  },
+  enemyDefeat: { description: "Descending enemy defeat pluck with leaf tail.", steps: sequence([300, 220, 160], "triangle", 0.16) },
   goal: { description: "Original level finish flourish.", steps: sequence([520, 760, 980, 1320], "square", 0.14) },
-  boss: { description: "Low boss cue motif.", steps: sequence([180, 260, 340], "sawtooth", 0.14) },
+  boss: { description: "Legacy alias for low boss cue motif.", steps: sequence([180, 260, 340], "sawtooth", 0.14) },
+  bossTelegraph: {
+    description: "Low gear warning before a boss attack.",
+    steps: [
+      { frequency: 155, endFrequency: 210, delay: 0, duration: 0.08, volume: 0.15, waveform: "sawtooth" },
+      { frequency: 420, endFrequency: 360, delay: 0.045, duration: 0.055, volume: 0.08, waveform: "square" },
+    ],
+  },
+  bossHit: {
+    description: "Heavy boss armor hit with a brass snap.",
+    steps: [
+      { frequency: 260, endFrequency: 180, delay: 0, duration: 0.07, volume: 0.16, waveform: "triangle" },
+      { frequency: 920, endFrequency: 520, delay: 0.018, duration: 0.045, volume: 0.07, waveform: "square" },
+    ],
+  },
+  bossPhase: {
+    description: "Boss phase surge with rising machine pressure.",
+    steps: [
+      { frequency: 130, endFrequency: 260, delay: 0, duration: 0.11, volume: 0.17, waveform: "sawtooth" },
+      { frequency: 330, endFrequency: 660, delay: 0.066, duration: 0.09, volume: 0.11, waveform: "triangle" },
+      { frequency: 990, endFrequency: 1320, delay: 0.125, duration: 0.05, volume: 0.07, waveform: "square" },
+    ],
+  },
+  bossDefeat: { description: "Boss defeat collapse and victory rise.", steps: sequence([174.61, 130.81, 392, 523.25, 783.99], "triangle", 0.13) },
   cog: { description: "Alias for collectible cog sparkle.", steps: sequence([760, 980, 1240], "square", 0.12) },
   relic: { description: "Warm relic arpeggio.", steps: sequence([523.25, 659.25, 987.77], "triangle", 0.15) },
   spring: { description: "Elastic spring arpeggio.", steps: sequence([392, 523.25, 783.99], "square", 0.14) },
