@@ -387,6 +387,15 @@ const polishChecks: PolishRegressionCheck[] = [
       expect(level.decorations.length).toBeGreaterThanOrEqual(180);
     },
   },
+  {
+    name: "keeps final challenge readability pickups visible",
+    run: (levels) => {
+      const level = getLevel(levels, "final-crown");
+      const summary = getLevelContentSummary(level);
+      expect(summary.collectibleCount).toBeGreaterThanOrEqual(128);
+      expect(level.decorations.length).toBeGreaterThanOrEqual(260);
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
