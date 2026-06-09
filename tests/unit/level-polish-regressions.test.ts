@@ -484,6 +484,17 @@ const polishChecks: PolishRegressionCheck[] = [
       expect(level.windZones.length).toBeGreaterThanOrEqual(6);
     },
   },
+  {
+    name: "keeps level-09 encounter pacing varied",
+    run: (levels) => {
+      const level = getLevel(levels, "level-09");
+      const summary = getLevelContentSummary(level);
+      expect(summary.enemyCount).toBeGreaterThanOrEqual(12);
+      expect(summary.hazardTiles + level.hazards.length).toBeGreaterThanOrEqual(10);
+      expect(summary.movingPlatformCount).toBeGreaterThanOrEqual(7);
+      expect(level.windZones.length).toBeGreaterThanOrEqual(3);
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
