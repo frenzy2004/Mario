@@ -39,19 +39,86 @@ function createTile(scene: Phaser.Scene, key: string, base: number, light: numbe
   const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
   graphics.fillStyle(base, 1);
   graphics.fillRect(0, 0, 32, 32);
+  drawTileSurface(graphics, key, base, light, dark);
+  graphics.generateTexture(key, 32, 32);
+  graphics.destroy();
+}
+
+function drawTileSurface(
+  graphics: Phaser.GameObjects.Graphics,
+  key: string,
+  base: number,
+  light: number,
+  dark: number,
+): void {
   graphics.fillStyle(light, 1);
-  graphics.fillRect(0, 0, 32, 5);
+  graphics.fillRect(0, 0, 32, key === "tile-platform" ? 4 : 5);
   graphics.fillStyle(dark, 1);
   graphics.fillRect(0, 27, 32, 5);
-  graphics.lineStyle(1, dark, 0.45);
+  graphics.lineStyle(1, dark, 0.5);
   graphics.strokeRect(0.5, 0.5, 31, 31);
+
+  if (key === "tile-platform") {
+    graphics.fillStyle(0x4a321d, 0.42);
+    graphics.fillRect(0, 15, 32, 2);
+    graphics.fillStyle(0xfde68a, 0.72);
+    graphics.fillRect(3, 6, 11, 2);
+    graphics.fillRect(18, 6, 10, 2);
+    graphics.fillStyle(0x3b2413, 0.9);
+    for (const x of [5, 15, 25]) {
+      graphics.fillCircle(x, 22, 1.5);
+    }
+    return;
+  }
+
+  if (key === "tile-hazard" || key === "hazard-crush-block") {
+    graphics.fillStyle(0xff6b7a, key === "tile-hazard" ? 0.95 : 0.5);
+    graphics.fillTriangle(4, 27, 9, 11, 14, 27);
+    graphics.fillTriangle(13, 27, 18, 8, 23, 27);
+    graphics.fillTriangle(22, 27, 27, 13, 31, 27);
+    graphics.fillStyle(dark, 0.65);
+    graphics.fillRect(0, 26, 32, 2);
+    return;
+  }
+
+  if (key === "tile-spring") {
+    graphics.fillStyle(0x17536b, 0.95);
+    graphics.fillRoundedRect(7, 20, 18, 6, 2);
+    graphics.lineStyle(2, 0xd7fff7, 1);
+    graphics.lineBetween(9, 20, 13, 11);
+    graphics.lineBetween(13, 11, 18, 20);
+    graphics.lineBetween(18, 20, 23, 11);
+    graphics.fillStyle(0xf4fcff, 1);
+    graphics.fillRect(6, 7, 20, 4);
+    return;
+  }
+
+  if (key === "tile-wind") {
+    graphics.fillStyle(0xf4fcff, 0.5);
+    graphics.fillEllipse(10, 12, 16, 5);
+    graphics.fillEllipse(22, 20, 14, 4);
+    graphics.lineStyle(1, 0x285c83, 0.65);
+    graphics.strokeCircle(16, 16, 9);
+    return;
+  }
+
+  graphics.fillStyle(0x9ff0a9, key === "tile-ground-edge" ? 0.9 : 0.34);
+  if (key === "tile-ground-edge") {
+    graphics.fillRect(0, 0, 32, 3);
+    graphics.fillTriangle(2, 4, 7, 4, 3, 10);
+    graphics.fillTriangle(22, 4, 29, 4, 26, 11);
+  }
+
   for (let i = 0; i < 5; i += 1) {
     const x = 4 + i * 6;
     graphics.fillStyle(i % 2 ? dark : light, 0.42);
     graphics.fillRect(x, 10 + ((i * 7) % 12), 3, 3);
   }
-  graphics.generateTexture(key, 32, 32);
-  graphics.destroy();
+  graphics.fillStyle(base, 0.82);
+  graphics.fillRect(0, 15, 32, 1);
+  graphics.fillStyle(dark, 0.28);
+  graphics.fillRect(9, 4, 1, 22);
+  graphics.fillRect(21, 4, 1, 22);
 }
 
 function createOrb(scene: Phaser.Scene, key: string, color: number, size: number): void {
@@ -269,26 +336,199 @@ function createEnemyTextures(scene: Phaser.Scene): void {
         continue;
       }
       const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-      const pulse = Math.sin(frame * 1.7) * 2;
-      graphics.fillStyle(0x000000, 0.18);
-      graphics.fillEllipse(16, 28, 25, 6);
-      graphics.fillStyle(base, 1);
-      graphics.fillRoundedRect(4, 8 - pulse * 0.2, 24, 19 + pulse, 7);
-      graphics.fillStyle(accent, 1);
-      graphics.fillCircle(12, 14, 3);
-      graphics.fillCircle(21, 14, 3);
-      graphics.fillStyle(0x111827, 1);
-      graphics.fillCircle(12, 14, 1.2);
-      graphics.fillCircle(21, 14, 1.2);
-      if (prefix === "enemy-spiker") {
-        graphics.fillStyle(accent, 1);
-        graphics.fillTriangle(8, 8, 12, 0, 16, 8);
-        graphics.fillTriangle(16, 8, 20, 0, 24, 8);
-      }
+      drawEnemyFrame(graphics, prefix, base, accent, frame);
       graphics.generateTexture(key, 32, 32);
       graphics.destroy();
     }
   }
+}
+
+function drawEnemyFrame(
+  graphics: Phaser.GameObjects.Graphics,
+  prefix: string,
+  base: number,
+  accent: number,
+  frame: number,
+): void {
+  const pulse = Math.sin(frame * 1.7) * 2;
+  graphics.fillStyle(0x000000, 0.18);
+  graphics.fillEllipse(16, 28, 25, 6);
+
+  switch (prefix) {
+    case "enemy-beetle":
+      drawBeetleEnemy(graphics, base, accent, frame);
+      break;
+    case "enemy-acorn":
+      drawAcornEnemy(graphics, base, accent, pulse);
+      break;
+    case "enemy-lantern":
+      drawLanternEnemy(graphics, base, accent, pulse);
+      break;
+    case "enemy-charger":
+      drawChargerEnemy(graphics, base, accent, frame);
+      break;
+    case "enemy-spiker":
+      drawSpikerEnemy(graphics, base, accent, pulse);
+      break;
+    case "enemy-turret":
+      drawTurretEnemy(graphics, base, accent, frame);
+      break;
+    default:
+      drawRoundEnemy(graphics, base, accent, pulse);
+      break;
+  }
+}
+
+function drawRoundEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  pulse: number,
+): void {
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(4, 8 - pulse * 0.2, 24, 19 + pulse, 7);
+  drawEnemyEyes(graphics, accent, 12, 21, 14);
+}
+
+function drawBeetleEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  frame: number,
+): void {
+  const step = frame % 2 === 0 ? 1 : -1;
+  graphics.fillStyle(0x2f2419, 1);
+  graphics.fillRoundedRect(4, 15, 24, 12, 6);
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(5, 10, 22, 15, 8);
+  graphics.fillStyle(0x3b2a1e, 0.75);
+  graphics.fillRect(15, 10, 2, 14);
+  graphics.fillStyle(accent, 1);
+  graphics.fillRect(8, 13, 6, 3);
+  graphics.fillRect(18, 13, 6, 3);
+  graphics.lineStyle(2, 0x1f2937, 1);
+  graphics.lineBetween(8, 24, 5, 27 + step);
+  graphics.lineBetween(13, 25, 11, 28 - step);
+  graphics.lineBetween(20, 25, 22, 28 - step);
+  graphics.lineBetween(25, 24, 28, 27 + step);
+  drawEnemyEyes(graphics, 0xfef3c7, 11, 21, 15);
+}
+
+function drawAcornEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  pulse: number,
+): void {
+  graphics.fillStyle(0x4a2d16, 1);
+  graphics.fillRoundedRect(5, 7 - pulse * 0.2, 22, 8, 4);
+  graphics.fillStyle(0x7c4a1f, 1);
+  for (const x of [8, 14, 20]) {
+    graphics.fillRect(x, 8, 3, 2);
+  }
+  graphics.fillStyle(base, 1);
+  graphics.fillEllipse(16, 19 + pulse * 0.2, 21, 19 + pulse);
+  graphics.fillStyle(accent, 1);
+  graphics.fillTriangle(16, 28, 12, 22, 20, 22);
+  drawEnemyEyes(graphics, 0xfef3c7, 12, 20, 17);
+}
+
+function drawLanternEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  pulse: number,
+): void {
+  graphics.fillStyle(accent, 0.24);
+  graphics.fillCircle(16, 17, 14 + pulse * 0.5);
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRoundedRect(9, 7, 14, 21, 4);
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(10, 8, 12, 19, 4);
+  graphics.fillStyle(accent, 1);
+  graphics.fillRoundedRect(12, 12, 8, 10, 3);
+  graphics.lineStyle(1, 0x134e4a, 1);
+  graphics.lineBetween(15, 8, 15, 26);
+  graphics.lineBetween(20, 8, 20, 25);
+  graphics.fillStyle(0xf0fdfa, 1);
+  graphics.fillCircle(15, 16, 1.5);
+  graphics.fillCircle(19, 16, 1.5);
+  graphics.lineStyle(2, 0x67e8f9, 0.65);
+  graphics.strokeCircle(16, 17, 9);
+}
+
+function drawChargerEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  frame: number,
+): void {
+  const lean = frame % 2 === 0 ? -1 : 1;
+  graphics.fillStyle(0x24103f, 1);
+  graphics.fillRoundedRect(3 + lean, 11, 26, 16, 5);
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(4 + lean, 9, 24, 17, 5);
+  graphics.fillStyle(0xc4b5fd, 1);
+  graphics.fillTriangle(6 + lean, 12, 0, 16, 7 + lean, 18);
+  graphics.fillTriangle(25 + lean, 12, 32, 16, 25 + lean, 18);
+  graphics.fillStyle(0x1e1b4b, 1);
+  graphics.fillRect(8 + lean, 18, 17, 4);
+  drawEnemyEyes(graphics, accent, 11 + lean, 22 + lean, 15);
+}
+
+function drawSpikerEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  pulse: number,
+): void {
+  graphics.fillStyle(accent, 1);
+  graphics.fillTriangle(6, 11, 10, 1, 14, 11);
+  graphics.fillTriangle(13, 10, 17, 0, 21, 10);
+  graphics.fillTriangle(20, 11, 24, 1, 28, 11);
+  graphics.fillStyle(0x3b1426, 1);
+  graphics.fillRoundedRect(4, 10 - pulse * 0.2, 24, 17 + pulse, 4);
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(6, 12 - pulse * 0.2, 20, 14 + pulse, 4);
+  graphics.lineStyle(2, accent, 1);
+  graphics.lineBetween(8, 23, 24, 14);
+  drawEnemyEyes(graphics, 0xfef3c7, 12, 21, 17);
+}
+
+function drawTurretEnemy(
+  graphics: Phaser.GameObjects.Graphics,
+  base: number,
+  accent: number,
+  frame: number,
+): void {
+  const glow = frame % 2 === 0 ? 0.9 : 0.45;
+  graphics.fillStyle(0x052e16, 1);
+  graphics.fillRoundedRect(4, 17, 24, 10, 4);
+  graphics.fillStyle(base, 1);
+  graphics.fillRoundedRect(6, 13, 20, 13, 5);
+  graphics.fillStyle(0x334155, 1);
+  graphics.fillRect(22, 16, 9, 5);
+  graphics.fillStyle(accent, glow);
+  graphics.fillCircle(15, 18, 4);
+  graphics.fillStyle(0xfef3c7, 1);
+  graphics.fillCircle(15, 18, 1.5);
+  graphics.lineStyle(2, 0x86efac, 0.7);
+  graphics.strokeCircle(15, 18, 7);
+}
+
+function drawEnemyEyes(
+  graphics: Phaser.GameObjects.Graphics,
+  color: number,
+  leftX: number,
+  rightX: number,
+  y: number,
+): void {
+  graphics.fillStyle(color, 1);
+  graphics.fillCircle(leftX, y, 2.5);
+  graphics.fillCircle(rightX, y, 2.5);
+  graphics.fillStyle(0x111827, 1);
+  graphics.fillCircle(leftX, y, 1);
+  graphics.fillCircle(rightX, y, 1);
 }
 
 function createCollectibleTextures(scene: Phaser.Scene): void {
@@ -456,21 +696,58 @@ function createBossTextures(scene: Phaser.Scene): void {
       continue;
     }
     const graphics = scene.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0x0f172a, 0.22);
-    graphics.fillEllipse(48, 72, 76, 16);
-    graphics.fillStyle(0x7c3aed, 1);
-    graphics.fillRoundedRect(12, 18 + Math.sin(frame) * 3, 72, 48, 12);
-    graphics.fillStyle(0xfacc15, 1);
-    graphics.fillCircle(34, 38, 9);
-    graphics.fillCircle(62, 38, 9);
-    graphics.fillStyle(0x111827, 1);
-    graphics.fillCircle(34, 38, 3);
-    graphics.fillCircle(62, 38, 3);
-    graphics.lineStyle(5, 0xf97316, 1);
-    graphics.strokeCircle(48, 43, 26 + frame);
+    drawBossWardenFrame(graphics, frame);
     graphics.generateTexture(key, 96, 84);
     graphics.destroy();
   }
+}
+
+function drawBossWardenFrame(graphics: Phaser.GameObjects.Graphics, frame: number): void {
+  const bob = Math.sin(frame) * 3;
+  const gearRadius = 27 + frame;
+
+  graphics.fillStyle(0x0f172a, 0.24);
+  graphics.fillEllipse(48, 72, 76, 16);
+  graphics.fillStyle(0x2f1659, 1);
+  graphics.fillRoundedRect(10, 22 + bob, 76, 45, 12);
+  graphics.fillStyle(0x7c3aed, 1);
+  graphics.fillRoundedRect(14, 17 + bob, 68, 49, 12);
+  graphics.fillStyle(0x4c1d95, 1);
+  graphics.fillRoundedRect(22, 48 + bob, 52, 13, 6);
+
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRoundedRect(20, 28 + bob, 56, 22, 8);
+  graphics.fillStyle(0xfacc15, 1);
+  graphics.fillCircle(34, 38 + bob, 9);
+  graphics.fillCircle(62, 38 + bob, 9);
+  graphics.fillStyle(0x111827, 1);
+  graphics.fillCircle(34, 38 + bob, 3);
+  graphics.fillCircle(62, 38 + bob, 3);
+  graphics.fillStyle(0xfef3c7, 1);
+  graphics.fillCircle(31, 35 + bob, 2);
+  graphics.fillCircle(59, 35 + bob, 2);
+
+  graphics.lineStyle(5, 0xf97316, 1);
+  graphics.strokeCircle(48, 43 + bob, gearRadius);
+  graphics.lineStyle(2, 0xfacc15, 0.9);
+  for (let tooth = 0; tooth < 10; tooth += 1) {
+    const angle = (Math.PI * 2 * tooth) / 10 + frame * 0.1;
+    const innerX = 48 + Math.cos(angle) * (gearRadius - 2);
+    const innerY = 43 + bob + Math.sin(angle) * (gearRadius - 2);
+    const outerX = 48 + Math.cos(angle) * (gearRadius + 7);
+    const outerY = 43 + bob + Math.sin(angle) * (gearRadius + 7);
+    graphics.lineBetween(innerX, innerY, outerX, outerY);
+  }
+
+  graphics.fillStyle(0x22c55e, 1);
+  graphics.fillEllipse(27, 18 + bob, 16, 8);
+  graphics.fillEllipse(68, 17 + bob, 18, 8);
+  graphics.fillStyle(0x8dde73, 1);
+  graphics.fillEllipse(39, 13 + bob, 14, 7);
+  graphics.fillEllipse(56, 13 + bob, 14, 7);
+  graphics.fillStyle(0x0f172a, 1);
+  graphics.fillRect(32, 64 + bob, 10, 7);
+  graphics.fillRect(55, 64 + bob, 10, 7);
 }
 
 function createUiTextures(scene: Phaser.Scene): void {
