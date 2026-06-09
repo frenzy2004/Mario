@@ -225,6 +225,8 @@ export type PlayerAnimationState =
   | "skid"
   | "jump"
   | "fall"
+  | "dash"
+  | "glide"
   | "land"
   | "hurt"
   | "victory";
@@ -239,12 +241,14 @@ export interface PlayerAnimationDefinition {
 }
 
 export const PLAYER_ANIMATIONS = {
-  idle: { key: "hero-idle", frames: 4, frameRate: 7, repeat: -1 },
-  run: { key: "hero-run", frames: 8, frameRate: 12, repeat: -1 },
-  skid: { key: "hero-skid", frames: 3, frameRate: 10, repeat: -1 },
-  jump: { key: "hero-jump", frames: 2, frameRate: 9, repeat: -1 },
-  fall: { key: "hero-fall", frames: 2, frameRate: 8, repeat: -1 },
-  land: { key: "hero-land", frames: 3, frameRate: 12, repeat: 0 },
-  hurt: { key: "hero-hurt", frames: 4, frameRate: 10, repeat: 0 },
-  victory: { key: "hero-victory", frames: 6, frameRate: 9, repeat: -1 },
+  idle: { key: "hero-idle", frames: 6, frameRate: 7, repeat: -1 },
+  run: { key: "hero-run", frames: 10, frameRate: 14, repeat: -1 },
+  skid: { key: "hero-skid", frames: 4, frameRate: 12, repeat: -1 },
+  jump: { key: "hero-jump", frames: 3, frameRate: 10, repeat: -1 },
+  fall: { key: "hero-fall", frames: 3, frameRate: 8, repeat: -1 },
+  dash: { key: "hero-dash", frames: 4, frameRate: 18, repeat: -1 },
+  glide: { key: "hero-glide", frames: 4, frameRate: 8, repeat: -1 },
+  land: { key: "hero-land", frames: 4, frameRate: 13, repeat: 0 },
+  hurt: { key: "hero-hurt", frames: 5, frameRate: 11, repeat: 0 },
+  victory: { key: "hero-victory", frames: 8, frameRate: 10, repeat: -1 },
 } satisfies Record<PlayerAnimationState, PlayerAnimationDefinition>;

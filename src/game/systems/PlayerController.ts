@@ -166,12 +166,17 @@ export class PlayerController {
     if (!this.player.hasControl) {
       return;
     }
+    const dashActive = time - this.state.dashStartedAt < PLAYER_CONFIG.dashMs;
     if (time < this.player.hurtAnimationUntil) {
       this.player.setAnimationState("hurt");
+    } else if (dashActive) {
+      this.player.setAnimationState("dash");
     } else if (grounded && time < this.state.landAnimationUntil) {
       this.player.setAnimationState("land");
     } else if (body.velocity.y < -35 && !grounded) {
       this.player.setAnimationState("jump");
+    } else if (snapshot.jump && this.player.hasGlider(time) && body.velocity.y > -10 && !grounded) {
+      this.player.setAnimationState("glide");
     } else if (body.velocity.y > 55 && !grounded) {
       this.player.setAnimationState("fall");
     } else if (

@@ -341,9 +341,12 @@ export class PlayScene extends Phaser.Scene {
       });
     };
     this.events.on("audio:jump", () => cue("jump"));
+    this.events.on("audio:land", () => cue("land"));
+    this.events.on("audio:dash", () => cue("dash"));
     this.events.on("audio:collect", () => cue("collect"));
     this.events.on("audio:hurt", () => cue("hurt"));
     this.events.on("audio:checkpoint", () => cue("checkpoint"));
+    this.events.on("audio:powerup", () => cue("powerup"));
     this.events.on("audio:goal", () => cue("goal"));
   }
 

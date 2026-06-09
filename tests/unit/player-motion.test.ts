@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PLAYER_ANIMATIONS,
   PLAYER_CONFIG,
   PLAYER_MOTION_EVENTS,
   createPlayerDashTrailCue,
@@ -8,6 +9,7 @@ import {
   createPlayerPowerAuraCue,
   createPlayerSquashStretchCue,
 } from "../../src/game/config/player";
+import { SFX_DEFINITIONS } from "../../src/game/config/audio";
 
 describe("player motion feel cues", () => {
   it("keeps the MotionSystem event names stable", () => {
@@ -78,5 +80,21 @@ describe("player motion feel cues", () => {
       maxHealth: PLAYER_CONFIG.maxHealth,
       durationMs: PLAYER_CONFIG.dashMs,
     });
+  });
+
+  it("keeps premium movement states available for the player sprite", () => {
+    expect(PLAYER_ANIMATIONS.dash.frames).toBeGreaterThanOrEqual(4);
+    expect(PLAYER_ANIMATIONS.glide.frames).toBeGreaterThanOrEqual(4);
+    expect(PLAYER_ANIMATIONS.run.frameRate).toBeGreaterThan(PLAYER_ANIMATIONS.idle.frameRate);
+    expect(Object.keys(PLAYER_ANIMATIONS)).toContain("victory");
+  });
+
+  it("uses layered movement sound cues for stronger character feel", () => {
+    expect(SFX_DEFINITIONS.jump.steps.length).toBeGreaterThanOrEqual(2);
+    expect(SFX_DEFINITIONS.land.steps.length).toBeGreaterThanOrEqual(2);
+    expect(SFX_DEFINITIONS.dash.steps.length).toBeGreaterThanOrEqual(3);
+    expect(SFX_DEFINITIONS.dash.steps[SFX_DEFINITIONS.dash.steps.length - 1]?.frequency).toBeGreaterThan(
+      SFX_DEFINITIONS.dash.steps[0]!.frequency,
+    );
   });
 });
