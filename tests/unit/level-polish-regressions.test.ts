@@ -886,6 +886,16 @@ const polishChecks: PolishRegressionCheck[] = [
       }
     },
   },
+  {
+    name: "keeps the campaign goal chain continuous",
+    run: (levels) => {
+      const ordered = [...levels].sort((a, b) => a.index - b.index);
+      for (let index = 0; index < ordered.length - 1; index += 1) {
+        expect(ordered[index].goal.nextLevelId).toBe(ordered[index + 1].id);
+      }
+      expect(ordered.at(-1)?.goal.nextLevelId).toBeUndefined();
+    },
+  },
 ];
 
 function getLevel(levels: readonly LevelDefinition[], id: string): LevelDefinition {
