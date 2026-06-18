@@ -208,14 +208,28 @@ export class WorldMapScene extends Phaser.Scene {
       node.circle.setScale(active ? 1.35 : 1);
       node.label.setScale(active ? 1.08 : 1);
       node.circle.setStrokeStyle(active ? 4 : 2, active ? 0xfde68a : 0xf8fafc, active ? 0.95 : 0.5);
+      if (active) {
+        this.tweens.add({
+          targets: node.circle,
+          scale: 1.48,
+          duration: 520,
+          ease: "Sine.easeInOut",
+          yoyo: true,
+          repeat: -1,
+        });
+      }
     }
 
     const best = this.save.bestTimes[selected.id];
-    const status = best === undefined ? "New" : `Best ${formatTime(best)}`;
     const locked = !levelIsUnlocked(selected.index, this.save.unlockedLevel);
+    const status = locked
+      ? "Locked - clear the previous stop"
+      : best === undefined
+        ? "Ready to clear"
+        : `Cleared - best ${formatTime(best)}`;
     this.detailText?.setText(
       locked
-        ? `${selected.title}\nLocked`
+        ? `${selected.title}\n${status}`
         : `${selected.title}   ${status}\n${selected.chapter}`,
     );
   }
