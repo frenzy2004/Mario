@@ -48,6 +48,30 @@ export const LEVEL_META: readonly LevelMeta[] = [
 
 export const LEVEL_COUNT = LEVEL_META.length;
 
+export interface CampaignProgress {
+  completed: number;
+  total: number;
+  percent: number;
+  label: string;
+  complete: boolean;
+}
+
+export function campaignProgress(bestTimes: Record<string, number>): CampaignProgress {
+  const completed = LEVEL_META.reduce(
+    (count, meta) => count + (Object.hasOwn(bestTimes, meta.id) ? 1 : 0),
+    0,
+  );
+  const percent = Math.round((completed / LEVEL_COUNT) * 100);
+
+  return {
+    completed,
+    total: LEVEL_COUNT,
+    percent,
+    label: `${completed}/${LEVEL_COUNT} cleared (${percent}%)`,
+    complete: completed >= LEVEL_COUNT,
+  };
+}
+
 export function clampLevelIndex(index: number): number {
   return Math.max(0, Math.min(Math.floor(Number.isFinite(index) ? index : 0), LEVEL_COUNT - 1));
 }

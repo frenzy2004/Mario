@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { LEVEL_COUNT, LEVEL_META, clampLevelIndex, levelIsUnlocked } from "../levels/meta";
+import { LEVEL_COUNT, LEVEL_META, campaignProgress, clampLevelIndex, levelIsUnlocked } from "../levels/meta";
 import { ensureGameplayScenes } from "../systems/SceneLoadSystem";
 import { SaveSystem, type SaveData } from "../systems/SaveSystem";
 
@@ -59,6 +59,7 @@ export class WorldMapScene extends Phaser.Scene {
         color: "#bae6fd",
       })
       .setOrigin(0.5);
+    this.drawProgress();
 
     this.drawRoutes();
     this.drawNodes();
@@ -111,6 +112,27 @@ export class WorldMapScene extends Phaser.Scene {
         repeat: -1,
         ease: "Sine.easeInOut",
       });
+    }
+  }
+
+  private drawProgress(): void {
+    const progress = campaignProgress(this.save.bestTimes);
+    const railWidth = 310;
+    const railX = 480 - railWidth / 2;
+    const fillWidth = Math.round((progress.percent / 100) * railWidth);
+
+    this.add
+      .text(480, 98, `Campaign ${progress.label}`, {
+        fontFamily: "system-ui",
+        fontSize: "13px",
+        color: progress.complete ? "#fde68a" : "#93c5fd",
+      })
+      .setOrigin(0.5);
+    this.add.rectangle(480, 116, railWidth, 6, 0x0f172a, 0.92).setStrokeStyle(1, 0x38bdf8, 0.36);
+    if (fillWidth > 0) {
+      this.add
+        .rectangle(railX + fillWidth / 2, 116, fillWidth, 6, progress.complete ? 0xfacc15 : 0x22c55e, 0.88)
+        .setOrigin(0.5);
     }
   }
 

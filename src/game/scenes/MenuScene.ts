@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { getLevelMetaByIndex, LEVEL_COUNT, levelIndexFromSearch } from "../levels/meta";
+import { campaignProgress, getLevelMetaByIndex, LEVEL_COUNT, levelIndexFromSearch } from "../levels/meta";
 import { ensureGameplayScenes } from "../systems/SceneLoadSystem";
 import { SaveSystem } from "../systems/SaveSystem";
 
@@ -20,6 +20,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.selectedLevel > save.unlockedLevel) {
       this.selectedLevel = Math.min(save.unlockedLevel, LEVEL_COUNT - 1);
     }
+    const progress = campaignProgress(save.bestTimes);
     this.cameras.main.setBackgroundColor("#07131e");
     this.cameras.main.fadeIn(320, 7, 19, 30);
     this.add.rectangle(480, 270, 960, 540, 0x07131e);
@@ -52,6 +53,13 @@ export class MenuScene extends Phaser.Scene {
         color: "#a7f3d0",
       })
       .setOrigin(0.5);
+    const progressText = this.add
+      .text(480, 214, `Campaign ${progress.label}`, {
+        fontFamily: "system-ui",
+        fontSize: "16px",
+        color: progress.complete ? "#fde68a" : "#93c5fd",
+      })
+      .setOrigin(0.5);
     const continueText = this.add
       .text(480, 260, `Continue: ${getLevelMetaByIndex(this.selectedLevel).title}`, {
         fontFamily: "system-ui",
@@ -66,7 +74,7 @@ export class MenuScene extends Phaser.Scene {
         color: "#e0f2fe",
       })
       .setOrigin(0.5);
-    for (const [index, target] of [title, subtitle, continueText, controls].entries()) {
+    for (const [index, target] of [title, subtitle, progressText, continueText, controls].entries()) {
       target.setAlpha(0);
       target.setY(target.y + 10);
       this.tweens.add({
