@@ -8,6 +8,7 @@ export class MenuScene extends Phaser.Scene {
   private saveSystem = new SaveSystem();
   private transitioning = false;
   private shareStatus?: Phaser.GameObjects.Text;
+  private shareStatusClearEvent?: Phaser.Time.TimerEvent;
 
   constructor() {
     super("MenuScene");
@@ -204,7 +205,26 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private setShareStatus(status: string): void {
-    this.shareStatus?.setText(status);
+    if (!this.shareStatus) {
+      return;
+    }
+
+    this.shareStatusClearEvent?.remove(false);
+    this.tweens.killTweensOf(this.shareStatus);
+    this.shareStatus.setText(status).setAlpha(1);
+    if (!status) {
+      return;
+    }
+
+    this.shareStatusClearEvent = this.time.delayedCall(2400, () => {
+      this.tweens.add({
+        targets: this.shareStatus,
+        alpha: 0,
+        duration: 260,
+        ease: "Sine.easeOut",
+        onComplete: () => this.shareStatus?.setText(""),
+      });
+    });
   }
 
   private async copyFeedbackNote(): Promise<void> {
