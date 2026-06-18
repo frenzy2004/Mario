@@ -27,34 +27,34 @@ export class SettingsScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add
-      .text(480, 482, "Tap a row or press 1-5     Esc: Back", {
+      .text(480, 482, "Tap a row or press 1-5     Changes save instantly     Esc: Back", {
         fontFamily: "system-ui",
         fontSize: "17px",
         color: "#bae6fd",
         align: "center",
       })
       .setOrigin(0.5);
-    this.addSettingRow(480, 144, `Volume: ${Math.round(settings.volume * 100)}%`, () => {
+    this.addSettingRow(480, 144, `1  Volume: ${Math.round(settings.volume * 100)}%`, () => {
       settings.volume = settings.volume > 0.1 ? 0 : 0.42;
       this.saveSystem.saveSettings(settings);
       this.scene.restart();
     });
-    this.addSettingRow(480, 194, `Motion: ${formatMotionLevel(settings.motionLevel)}`, () => {
+    this.addSettingRow(480, 194, `2  Motion: ${formatMotionLevel(settings.motionLevel)}`, () => {
       applyMotionLevel(settings, nextMotionLevel(settings.motionLevel));
       this.saveSystem.saveSettings(settings);
       this.scene.restart();
     });
-    this.addSettingRow(480, 244, `Assist mode: ${settings.assistMode ? "On" : "Off"}`, () => {
+    this.addSettingRow(480, 244, `3  Assist mode: ${settings.assistMode ? "On" : "Off"}`, () => {
       settings.assistMode = !settings.assistMode;
       this.saveSystem.saveSettings(settings);
       this.scene.restart();
     });
-    this.addSettingRow(480, 294, `Sound cues: ${settings.showSoundCues ? "On" : "Off"}`, () => {
+    this.addSettingRow(480, 294, `4  Sound cues: ${settings.showSoundCues ? "On" : "Off"}`, () => {
       settings.showSoundCues = !settings.showSoundCues;
       this.saveSystem.saveSettings(settings);
       this.scene.restart();
     });
-    this.addSettingRow(480, 344, `Touch controls: ${touchModeLabel}`, () => {
+    this.addSettingRow(480, 344, `5  Touch controls: ${touchModeLabel}`, () => {
       settings.touchControls = nextTouchControlsMode(touchMode);
       this.saveSystem.saveSettings(settings);
       this.scene.restart();
