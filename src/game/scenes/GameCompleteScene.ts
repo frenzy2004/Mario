@@ -40,7 +40,7 @@ export class GameCompleteScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const prompt = this.add
-      .text(480, 330, "Enter: Main Menu", {
+      .text(480, 330, "Enter / Tap: Main Menu", {
         fontFamily: "system-ui",
         fontSize: "18px",
         color: "#bae6fd",
