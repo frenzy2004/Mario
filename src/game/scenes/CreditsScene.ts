@@ -23,7 +23,7 @@ export class CreditsScene extends Phaser.Scene {
           "Original code, procedural art, generated level content, and synthesized sound.",
           "Built with Vite, TypeScript, and Phaser 3.",
           "",
-          "Esc: Back",
+          "Esc / Tap: Back",
         ].join("\n"),
         {
           fontFamily: "system-ui",
@@ -35,5 +35,6 @@ export class CreditsScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
     this.input.keyboard?.once("keydown-ESC", () => this.scene.start("MenuScene"));
+    this.input.once("pointerdown", () => this.scene.start("MenuScene"));
   }
 }
